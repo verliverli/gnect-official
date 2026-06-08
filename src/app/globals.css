@@ -1,0 +1,465 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ============================================
+   GNECT — Premium Night Edition Design System
+   
+   Design Philosophy:
+   - Rich charcoal surfaces — dark but not black, alive with depth
+   - Glowing grass green accent — shines like emerald in the night
+   - Warm gold/amber for luxury highlights
+   - Lightweight glassmorphism on headers, modals, bottom sheets
+   - Rounded shapes (2xl base, full for pills)
+   - Framer Motion micro-animations (GPU-accelerated only)
+   - Professional typography with proper hierarchy
+   - Generous spacing and breathing room
+   ============================================ */
+
+:root {
+  --radius: 0.875rem;
+  /* Light mode — warm, elegant, Gulf-inspired */
+  --background: #faf9f7;
+  --foreground: #1a1614;
+  --card: #ffffff;
+  --card-foreground: #1a1614;
+  --popover: #ffffff;
+  --popover-foreground: #1a1614;
+  --primary: #22c55e;
+  --primary-foreground: #ffffff;
+  --secondary: #f0ebe4;
+  --secondary-foreground: #3d3530;
+  --muted: #f0ebe4;
+  --muted-foreground: #8a7e74;
+  --accent: #f0ebe4;
+  --accent-foreground: #3d3530;
+  --destructive: #dc2626;
+  --border: #e0d8cf;
+  --input: #e0d8cf;
+  --ring: #22c55e;
+  --chart-1: #22c55e;
+  --chart-2: #d4a843;
+  --chart-3: #4ade80;
+  --chart-4: #16a34a;
+  --chart-5: #ca8a04;
+  --sidebar: #faf9f7;
+  --sidebar-foreground: #1a1614;
+  --sidebar-primary: #22c55e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0ebe4;
+  --sidebar-accent-foreground: #3d3530;
+  --sidebar-border: #e0d8cf;
+  --sidebar-ring: #22c55e;
+}
+
+.dark {
+  /* ============================================
+     DARK MODE — Premium Emerald Night Theme
+     
+     Color Philosophy:
+     - #1a1a2e — Charcoal background — clearly dark, not a void
+     - #22223a — Primary surface — rich, readable, inviting
+     - #2a2a42 — Card surface — clear lift with depth
+     - #303050 — Elevated surface — floating glass cards
+     - #22c55e — Grass green hero — confident, modern, alive
+     - #d4a843 — Gold accent — luxury, warmth, heritage
+     - #94949e — Muted text — clearly visible, never shouting
+     - #3a3a58 — Borders — present and defined, tailored
+     ============================================ */
+  --background: #1a1a2e;
+  --foreground: #e8e8f0;
+  --card: #22223a;
+  --card-foreground: #e8e8f0;
+  --popover: #2a2a42;
+  --popover-foreground: #e8e8f0;
+  --primary: #22c55e;
+  --primary-foreground: #ffffff;
+  --secondary: #303050;
+  --secondary-foreground: #e8e8f0;
+  --muted: #303050;
+  --muted-foreground: #94949e;
+  --accent: #333355;
+  --accent-foreground: #e8e8f0;
+  --destructive: #f85149;
+  --border: #3a3a58;
+  --input: #3a3a58;
+  --ring: #22c55e;
+  --chart-1: #22c55e;
+  --chart-2: #d4a843;
+  --chart-3: #4ade80;
+  --chart-4: #16a34a;
+  --chart-5: #86efac;
+  --sidebar: #22223a;
+  --sidebar-foreground: #e8e8f0;
+  --sidebar-primary: #22c55e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #303050;
+  --sidebar-accent-foreground: #e8e8f0;
+  --sidebar-border: #3a3a58;
+  --sidebar-ring: #22c55e;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ============================================
+   GNECT PREMIUM ANIMATIONS & UTILITIES
+   GPU-accelerated only — transforms & opacity
+   ============================================ */
+
+/* Tab fade — smooth, confident entry */
+.gnect-tab-fade {
+  animation: gnectFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes gnectFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Bubble enter — WhatsApp-like pop with spring */
+.gnect-bubble-enter {
+  animation: gnectBubbleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes gnectBubbleIn {
+  from { opacity: 0; transform: scale(0.9) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Custom scrollbar — ultra-thin with green accent */
+.gnect-scroll::-webkit-scrollbar {
+  width: 2px;
+}
+.gnect-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.gnect-scroll::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 999px;
+  opacity: 0.2;
+}
+
+/* Screenshot flash — privacy deterrent */
+.screenshot-flash {
+  animation: screenshotFlash 0.3s ease-out;
+}
+
+@keyframes screenshotFlash {
+  0% { opacity: 0; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Premium glow — subtle green radiance for active elements */
+.gnect-glow {
+  box-shadow:
+    0 0 20px rgba(34, 197, 94, 0.15),
+    0 0 40px rgba(34, 197, 94, 0.05);
+}
+
+/* Intense glow for focused/active states */
+.gnect-glow-strong {
+  box-shadow:
+    0 0 24px rgba(34, 197, 94, 0.3),
+    0 0 60px rgba(34, 197, 94, 0.1);
+}
+
+/* Green shine — that premium emerald glow */
+.gnect-shine {
+  box-shadow:
+    0 0 16px rgba(34, 197, 94, 0.25),
+    0 0 32px rgba(34, 197, 94, 0.1),
+    0 1px 0 rgba(34, 197, 94, 0.3) inset;
+}
+
+/* Gold glow — for premium/special elements */
+.gnect-glow-gold {
+  box-shadow:
+    0 0 20px rgba(212, 168, 67, 0.2),
+    0 0 40px rgba(212, 168, 67, 0.06);
+}
+
+/* Shimmer loading — elegant pulse */
+.gnect-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    rgba(34, 197, 94, 0.08) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: gnectShimmer 1.8s infinite;
+}
+
+@keyframes gnectShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ============================================
+   GLASSMORPHISM — Lightweight, premium
+   Applied to: headers, modals, bottom sheets, nav
+   NOT applied to: content cards, chat bubbles
+   ============================================ */
+
+/* Glass surface — header, bottom nav */
+.gnect-glass {
+  background: rgba(26, 26, 46, 0.72);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+/* Glass elevated — modals, overlays */
+.gnect-glass-elevated {
+  background: rgba(34, 34, 58, 0.82);
+  backdrop-filter: blur(20px) saturate(200%);
+  -webkit-backdrop-filter: blur(20px) saturate(200%);
+}
+
+/* Glass light — subtle for secondary bars */
+.gnect-glass-light {
+  background: rgba(26, 26, 46, 0.45);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+}
+
+/* ============================================
+   CHAT BUBBLE TAILS — Refined
+   ============================================ */
+
+.bubble-tail-right::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: -6px;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-left-color: var(--primary);
+  border-bottom: 0;
+  border-right: 0;
+}
+
+.bubble-tail-left::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -6px;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-right-color: var(--secondary);
+  border-bottom: 0;
+  border-left: 0;
+}
+
+/* ============================================
+   SAFE AREA & LAYOUT
+   ============================================ */
+
+/* Safe area for bottom navigation (notch devices) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Online status pulse — confident, alive, green glow */
+.online-pulse {
+  animation: onlinePulse 2s infinite;
+}
+
+@keyframes onlinePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+}
+
+/* Premium card surface — subtle depth */
+.gnect-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+.gnect-card:active {
+  transform: scale(0.98);
+}
+
+/* Hover effect for interactive cards */
+.gnect-card-hover {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, border-color 0.15s ease-out;
+}
+
+.gnect-card-hover:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 12px rgba(34, 197, 94, 0.12);
+}
+
+/* Shimmer hover — subtle highlight on hover */
+.gnect-shimmer-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.gnect-shimmer-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(34, 197, 94, 0.04) 50%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.gnect-shimmer-hover:hover::after {
+  opacity: 1;
+}
+
+/* Photo shimmer — loading state for images */
+.gnect-photo-shimmer {
+  background: var(--muted);
+}
+
+/* Premium button press — haptic-like feedback */
+.gnect-press {
+  transition: transform 0.1s ease-out;
+}
+.gnect-press:active {
+  transform: scale(0.96);
+}
+
+/* Smooth transition utility */
+.gnect-transition {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Gradient text — green to gold for hero elements */
+.gnect-gradient-text {
+  background: linear-gradient(135deg, #22c55e, #d4a843);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Premium focus ring */
+.gnect-focus-ring:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--primary);
+}
+
+/* Floating card shadow — depth without heaviness */
+.gnect-float {
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* Premium divider — barely there */
+.gnect-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border) 20%,
+    var(--border) 80%,
+    transparent
+  );
+}
+
+/* ============================================
+   TAB INDICATOR — Premium animated underline
+   ============================================ */
+.gnect-tab-indicator {
+  position: relative;
+}
+
+.gnect-tab-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 2.5px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+/* ============================================
+   AVATAR RING — Online status ring
+   ============================================ */
+.gnect-avatar-ring {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 3px var(--primary);
+}
+
+/* ============================================
+   FAB — Floating Action Button
+   ============================================ */
+.gnect-fab {
+  box-shadow:
+    0 4px 16px rgba(34, 197, 94, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+.gnect-fab:active {
+  transform: scale(0.9);
+  box-shadow:
+    0 2px 8px rgba(34, 197, 94, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.15);
+}
