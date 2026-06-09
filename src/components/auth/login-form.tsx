@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -77,6 +77,7 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
       >
         <h1 className="text-4xl font-bold gnect-gradient-text tracking-tight">GNECT</h1>
         <p className="text-muted-foreground mt-3 text-sm font-medium tracking-widest uppercase">Welcome back</p>
+        <p className="text-muted-foreground/50 mt-1 text-[10px] tracking-wide flex items-center justify-center gap-1"><Lock className="w-3 h-3" /> Private. Anonymous. Your data auto-deletes.</p>
       </motion.div>
 
       <motion.div

@@ -34,7 +34,7 @@ export function AgeGate({ onConfirm }: AgeGateProps) {
         className="text-center mb-8"
       >
         <h1 className="text-5xl font-bold gnect-gradient-text tracking-tight">GNECT</h1>
-        <p className="text-muted-foreground mt-3 text-sm font-medium tracking-widest uppercase">Connect. Meet. Explore.</p>
+        <p className="text-muted-foreground mt-3 text-sm font-medium tracking-widest uppercase">Private. Anonymous. Yours.</p>
       </motion.div>
 
       <motion.div
@@ -53,7 +53,7 @@ export function AgeGate({ onConfirm }: AgeGateProps) {
                 Are you 18 or older?
               </h2>
               <p className="text-muted-foreground text-sm mt-1.5 leading-relaxed">
-                This app contains adult content and is intended for consenting adults only. You must be 18 or older to use GNECT.
+                A private, anonymous space for consenting adults. No email, no phone, no real name. Your identity stays yours. You must be 18 or older.
               </p>
             </div>
 
@@ -79,7 +79,7 @@ export function AgeGate({ onConfirm }: AgeGateProps) {
                 </li>
                 <li className="flex gap-2">
                   <span className="text-primary shrink-0">•</span>
-                  <span>GNECT is designed for privacy. No email, phone, or real name is required to create an account.</span>
+                  <span>Your privacy is guaranteed — no email, phone, or real name required. Messages auto-delete. Screenshots are detected.</span>
                 </li>
               </ul>
             </div>
@@ -117,7 +117,7 @@ export function AgeGate({ onConfirm }: AgeGateProps) {
       </motion.div>
 
       <p className="text-muted-foreground/40 text-xs mt-8 text-center max-w-sm">
-        By continuing, you confirm you are of legal age, agree to the Terms of Service, and acknowledge the Privacy Policy.
+        By continuing, you confirm you are of legal age, agree to the Terms of Service, and acknowledge the Privacy Policy. Your data is encrypted and auto-deleted.
       </p>
     </motion.div>
   )

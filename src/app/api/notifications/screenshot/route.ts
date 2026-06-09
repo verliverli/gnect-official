@@ -37,7 +37,8 @@ export async function POST(req: Request) {
     }
 
     if (!partnerId) {
-      return NextResponse.json({ ok: false, error: 'Chat ID required' }, { status: 400 })
+      // No chatId provided or not in a chat — just log the screenshot, don't error
+      return NextResponse.json({ ok: true, noPartner: true })
     }
 
     // Create a notification for the chat partner that a screenshot was detected

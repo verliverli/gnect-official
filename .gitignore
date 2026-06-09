@@ -90,3 +90,4 @@ start-server.sh
 !public/
 agent-ctx/
 worklog.md
+test-results/

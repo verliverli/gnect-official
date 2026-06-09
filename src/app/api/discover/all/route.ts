@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const availability = searchParams.get("availability")
     const cursor = searchParams.get("cursor")
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20"), 1), 50)
+    const seedParam = searchParams.get("seed")
 
     // Validate search parameter
     if (search && search.length > 20) {
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest) {
         availability: true,
         is_online: true,
         last_seen: true,
+        in_app_at: true,
         street: true,
         cucumber_size: true,
         show_cucumber: true,
@@ -105,6 +107,30 @@ export async function GET(request: NextRequest) {
         },
       },
     })
+
+    // Shuffle users within online/offline tiers using seed for variety
+    const seed = seedParam ? parseInt(seedParam) : Math.floor(Date.now() / 86400000)
+
+    function seededRandom(s: number): number {
+      const x = Math.sin(s) * 10000
+      return x - Math.floor(x)
+    }
+
+    const onlineUsers = users.filter(u => u.is_online)
+    const offlineUsers = users.filter(u => !u.is_online)
+
+    for (let i = onlineUsers.length - 1; i > 0; i--) {
+      const j = Math.floor(seededRandom(seed + i) * (i + 1))
+      ;[onlineUsers[i], onlineUsers[j]] = [onlineUsers[j], onlineUsers[i]]
+    }
+    for (let i = offlineUsers.length - 1; i > 0; i--) {
+      const j = Math.floor(seededRandom(seed + i + 1000) * (i + 1))
+      ;[offlineUsers[i], offlineUsers[j]] = [offlineUsers[j], offlineUsers[i]]
+    }
+
+    // Replace users array with shuffled version
+    users.length = 0
+    users.push(...onlineUsers, ...offlineUsers)
 
     // Determine next cursor
     const hasNextPage = users.length > limit
@@ -128,6 +154,7 @@ export async function GET(request: NextRequest) {
       body_type: u.body_type,
       availability: u.availability,
       is_online: u.is_online,
+      is_in_app: u.in_app_at ? (Date.now() - new Date(u.in_app_at).getTime() < 2 * 60 * 1000) : false,
       last_seen: u.last_seen,
       street: u.street,
       cucumber_size: u.show_cucumber ? u.cucumber_size : null,

@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ShieldCheck, Flame, CheckCircle2, XCircle } from 'lucide-react'
+import { ShieldCheck, Flame, CheckCircle2, XCircle, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -49,16 +49,20 @@ export function SeriousnessGate({ onConfirm }: SeriousnessGateProps) {
               <h2 className="text-lg font-bold text-foreground">
                 This app is for REAL ones only.
               </h2>
+              <p className="text-muted-foreground text-xs mt-1 leading-relaxed">
+                Your privacy is non-negotiable. Everything auto-deletes. No data is shared. Ever.
+              </p>
             </div>
 
             {/* What we expect — checkmarks */}
             <div className="w-full rounded-2xl bg-primary/5 border border-primary/20 p-3 text-left space-y-2">
               <p className="text-[10px] font-semibold text-primary/70 uppercase tracking-wider">You confirm that:</p>
+              <p className="text-[9px] text-primary/50 mb-1 flex items-center gap-1"><Lock className="w-3 h-3" /> Privacy-first. No tracking. No data selling.</p>
               <ul className="space-y-1.5">
                 {[
                   'You are genuinely interested',
                   'You are serious about meeting',
-                  "You respect others' privacy",
+                  "You respect others' privacy — what happens here stays here",
                   'You are NOT a scammer',
                   "You are NOT here to waste people's time",
                 ].map((item) => (
@@ -102,8 +106,8 @@ export function SeriousnessGate({ onConfirm }: SeriousnessGateProps) {
             </div>
 
             {/* Footer warning */}
-            <p className="text-[10px] text-muted-foreground/60 text-center leading-relaxed mt-1">
-              Violating these rules = instant permanent ban. No second chances.
+            <p className="text-[10px] text-muted-foreground/60 text-center leading-relaxed mt-1 flex items-center justify-center gap-1">
+              Violating these rules = instant permanent ban. No second chances. <Lock className="w-3 h-3" /> Your data auto-deletes.
             </p>
           </CardContent>
         </Card>

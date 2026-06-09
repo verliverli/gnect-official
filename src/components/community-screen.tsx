@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, RefreshCw, Plus, Flame, Clock, User, Loader2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/lib/store'
+import { useDataStore } from '@/lib/data-store'
+import { useAppCache, dedupFetch } from '@/lib/app-cache'
 import { PostCard, type CommunityPost } from '@/components/community/post-card'
 import { CreatePostSheet } from '@/components/community/create-post-sheet'
 import { PostDetailView } from '@/components/community/post-detail-view'
@@ -23,14 +25,19 @@ type CategoryFilter = 'SFW' | 'NSFW' | 'All'
 
 export function CommunityScreen() {
   const { user: currentUser } = useAuthStore()
+  const dataStore = useDataStore
+  const appCache = useAppCache
+
+  // Read cached data from store for instant rendering
+  const cachedPosts = dataStore((s) => s.communityPosts)
 
   // Tab & filter state
   const [activeTab, setActiveTab] = useState<CommunityTab>('new')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('All')
 
-  // Posts state
-  const [posts, setPosts] = useState<CommunityPost[]>([])
-  const [loading, setLoading] = useState(true)
+  // Posts state — if cache exists, show it instantly (no spinner)
+  const [posts, setPosts] = useState<CommunityPost[]>(cachedPosts)
+  const [loading, setLoading] = useState(cachedPosts.length === 0)
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -47,68 +54,116 @@ export function CommunityScreen() {
   const [pullDistance, setPullDistance] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Request ID ref to prevent stale responses from overwriting newer ones
+  const requestIdRef = useRef(0)
+  // Ref for has-cached-data checks (avoid stale closures in useCallback)
+  const postsLengthRef = useRef(cachedPosts.length)
+  // Ref for cursor to avoid recreating fetchPosts on cursor change
+  const cursorRef = useRef<string | null>(null)
+
   // ========================================
-  // Fetch posts
+  // Fetch posts — consolidated with dedup, request ID, and cache support
   // ========================================
-  const fetchPosts = useCallback(async (append = false) => {
+  const fetchPosts = useCallback(async (append = false, silent = false) => {
     if (!currentUser) return
 
+    const requestId = ++requestIdRef.current
+
     const isRefresh = !append
-    if (isRefresh) setRefreshing(true)
+    const hasCachedData = postsLengthRef.current > 0
+    // Only show loading spinner if no cache and not silent
+    if (isRefresh && !silent && !hasCachedData) setRefreshing(true)
     else if (append) setLoadingMore(true)
-    else setLoading(true)
+    else if (!silent && !hasCachedData) setLoading(true)
+
+    // Use cursorRef instead of cursor state to avoid unstable dependency
+    const currentCursor = cursorRef.current
+
+    // Include tab+filter in dedup key so changing them always triggers a NEW fetch
+    const filterKey = `${activeTab}-${categoryFilter}`
+    const paramsKey = append && currentCursor ? `community-${currentCursor}-${filterKey}` : `community-${filterKey}`
 
     try {
-      const params = new URLSearchParams()
-      params.set('tab', activeTab)
-      params.set('limit', '20')
+      await dedupFetch(paramsKey, async () => {
+        const params = new URLSearchParams()
+        params.set('tab', activeTab)
+        params.set('limit', '20')
 
-      if (categoryFilter !== 'All') {
-        params.set('category', categoryFilter)
-      }
-
-      if (append && cursor) {
-        params.set('cursor', cursor)
-      }
-
-      const res = await fetch(`/api/community/posts?${params.toString()}`, { credentials: 'same-origin' })
-
-      if (!res.ok) {
-        try {
-          const errData = await res.json()
-          if (!append) setPosts([])
-          toast.error(errData.error || 'Failed to load posts')
-        } catch {
-          if (!append) setPosts([])
-          toast.error('Failed to load posts')
+        if (categoryFilter !== 'All') {
+          params.set('category', categoryFilter)
         }
-        return
-      }
 
-      const data = await res.json()
+        if (append && currentCursor) {
+          params.set('cursor', currentCursor)
+        }
 
-      if (data.ok) {
-        const newPosts = data.data || []
-        if (append) {
-          setPosts((prev) => [...prev, ...newPosts])
+        const res = await fetch(`/api/community/posts?${params.toString()}`, { credentials: 'same-origin' })
+
+        // Discard stale response if a newer request has been fired
+        if (requestId !== requestIdRef.current) return
+
+        if (!res.ok) {
+          try {
+            const errData = await res.json()
+            if (!append) {
+              setPosts([])
+              postsLengthRef.current = 0
+            }
+            if (!silent) toast.error(errData.error || 'Failed to load posts')
+          } catch {
+            if (!append) {
+              setPosts([])
+              postsLengthRef.current = 0
+            }
+            if (!silent) toast.error('Failed to load posts')
+          }
+          return
+        }
+
+        const data = await res.json()
+
+        // Discard stale response if a newer request has been fired
+        if (requestId !== requestIdRef.current) return
+
+        if (data.ok) {
+          const newPosts = data.data || []
+          if (append) {
+            setPosts((prev) => [...prev, ...newPosts])
+          } else {
+            setPosts(newPosts)
+            postsLengthRef.current = newPosts.length
+            // Update data store cache
+            dataStore.getState().setCommunityPosts(newPosts, data.nextCursor || null)
+            appCache.getState().setTimestamp('community')
+          }
+          cursorRef.current = data.nextCursor || null
+          setCursor(data.nextCursor || null)
+          setHasMore(!!data.nextCursor)
         } else {
-          setPosts(newPosts)
+          if (!append) {
+            setPosts([])
+            postsLengthRef.current = 0
+          }
+          if (!silent) toast.error(data.error || 'Failed to load posts')
         }
-        setCursor(data.nextCursor || null)
-        setHasMore(!!data.nextCursor)
-      } else {
-        if (!append) setPosts([])
-        toast.error(data.error || 'Failed to load posts')
-      }
+      })
     } catch {
-      if (!append) setPosts([])
-      toast.error('Network error')
+      // Discard stale response
+      if (requestId !== requestIdRef.current) return
+      if (!append) {
+        setPosts([])
+        postsLengthRef.current = 0
+      }
+      if (!silent) toast.error('Network error')
     } finally {
-      setLoading(false)
-      setRefreshing(false)
-      setLoadingMore(false)
+      // Only clear loading states if this is still the latest request
+      if (requestId === requestIdRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+        setLoadingMore(false)
+      }
     }
-  }, [currentUser, activeTab, categoryFilter, cursor])
+  }, [currentUser, activeTab, categoryFilter, dataStore, appCache])
 
   // ========================================
   // Initial fetch & refetch on tab/filter change
@@ -116,39 +171,11 @@ export function CommunityScreen() {
   useEffect(() => {
     if (currentUser) {
       setCursor(null)
+      cursorRef.current = null
       setPosts([])
+      postsLengthRef.current = 0
       setLoading(true)
-      // We need to fetch fresh since cursor is reset
-      const params = new URLSearchParams()
-      params.set('tab', activeTab)
-      params.set('limit', '20')
-      if (categoryFilter !== 'All') params.set('category', categoryFilter)
-
-      fetch(`/api/community/posts?${params.toString()}`, { credentials: 'same-origin' })
-        .then(async (r) => {
-          if (!r.ok) {
-            try {
-              const errData = await r.json()
-              toast.error(errData.error || 'Failed to load posts')
-            } catch {
-              toast.error('Failed to load posts')
-            }
-            return null
-          }
-          return r.json()
-        })
-        .then((data) => {
-          if (!data) return
-          if (data.ok) {
-            setPosts(data.data || [])
-            setCursor(data.nextCursor || null)
-            setHasMore(!!data.nextCursor)
-          } else {
-            setPosts([])
-          }
-        })
-        .catch(() => setPosts([]))
-        .finally(() => setLoading(false))
+      fetchPosts()
     }
   }, [currentUser, activeTab, categoryFilter])
 
@@ -217,6 +244,8 @@ export function CommunityScreen() {
   const onTouchEnd = () => {
     if (pullDistance > 50) {
       setCursor(null)
+      cursorRef.current = null
+      postsLengthRef.current = 0
       fetchPosts()
     }
     setPullStartY(null)
@@ -227,28 +256,12 @@ export function CommunityScreen() {
   // Handle post created
   // ========================================
   const handlePostCreated = useCallback(() => {
-    // Refresh feed
+    // Refresh feed — reset cursor and fetch fresh
     setCursor(null)
-    const params = new URLSearchParams()
-    params.set('tab', activeTab)
-    params.set('limit', '20')
-    if (categoryFilter !== 'All') params.set('category', categoryFilter)
-
-    fetch(`/api/community/posts?${params.toString()}`, { credentials: 'same-origin' })
-      .then(async (r) => {
-        if (!r.ok) return null
-        return r.json()
-      })
-      .then((data) => {
-        if (!data) return
-        if (data.ok) {
-          setPosts(data.data || [])
-          setCursor(data.nextCursor || null)
-          setHasMore(!!data.nextCursor)
-        }
-      })
-      .catch(() => {})
-  }, [activeTab, categoryFilter])
+    cursorRef.current = null
+    postsLengthRef.current = 0
+    fetchPosts()
+  }, [fetchPosts])
 
   // ========================================
   // Handle post deleted from detail view
@@ -262,25 +275,12 @@ export function CommunityScreen() {
   // ========================================
   const handleDetailClose = useCallback(() => {
     setDetailPostId(null)
-    // Refresh the current feed to sync any changes made in detail view
-    const params = new URLSearchParams()
-    params.set('tab', activeTab)
-    params.set('limit', '20')
-    if (categoryFilter !== 'All') params.set('category', categoryFilter)
-
-    fetch(`/api/community/posts?${params.toString()}`, { credentials: 'same-origin' })
-      .then(async (r) => {
-        if (!r.ok) return null
-        return r.json()
-      })
-      .then((data) => {
-        if (!data || !data.ok) return
-        setPosts(data.data || [])
-        setCursor(data.nextCursor || null)
-        setHasMore(!!data.nextCursor)
-      })
-      .catch(() => {})
-  }, [activeTab, categoryFilter])
+    // Refresh the current feed to sync any changes made in detail view (silent — no toast on error)
+    setCursor(null)
+    cursorRef.current = null
+    postsLengthRef.current = 0
+    fetchPosts(false, true)
+  }, [fetchPosts])
 
   // ========================================
   // Tab config
@@ -348,6 +348,8 @@ export function CommunityScreen() {
           return (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors relative ${
                 activeTab === tab.key ? 'text-primary' : 'text-muted-foreground'
@@ -369,6 +371,7 @@ export function CommunityScreen() {
           <button
             key={cat}
             onClick={() => setCategoryFilter(cat)}
+            aria-pressed={categoryFilter === cat}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
               categoryFilter === cat
                 ? cat === 'SFW'

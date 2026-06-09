@@ -1,13 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 
 // GET /api/cron/cleanup — Cleanup expired data
-// Called periodically (e.g., every 15 minutes by a cron service)
-export async function GET() {
+// Called periodically by external cron (cron-job.org) or manually by admin
+// Supports two auth methods:
+//   1. CRON_SECRET via Authorization header or ?secret= query param (for automated cron jobs)
+//   2. Admin user session (for manual triggers)
+export async function GET(request?: NextRequest) {
   try {
-    const user = await getCurrentUser()
-    if (!user || !user.is_admin) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    // Check for CRON_SECRET — supports header or query param for external cron services
+    const cronSecret = process.env.CRON_SECRET
+    const authHeader = request?.headers?.get('authorization')
+    const hasHeaderSecret = cronSecret && authHeader === `Bearer ${cronSecret}`
+    const querySecret = request?.nextUrl?.searchParams?.get('secret')
+    const hasQuerySecret = cronSecret && querySecret === cronSecret
+
+    // If no cron secret match, require admin auth
+    if (!hasHeaderSecret && !hasQuerySecret) {
+      const user = await getCurrentUser()
+      if (!user || !user.is_admin) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    }
 
     const now = new Date()
 
@@ -20,6 +33,18 @@ export async function GET() {
       },
       data: {
         is_online: false,
+        in_app_at: null, // Also clear in_app_at for stale users
+      },
+    })
+
+    // ===== 0.5. Clear stale in_app_at for users who are offline but still have in_app_at =====
+    const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000)
+    const staleInAppUsers = await db.user.updateMany({
+      where: {
+        in_app_at: { not: null, lt: twoMinutesAgo },
+      },
+      data: {
+        in_app_at: null,
       },
     })
 
@@ -96,13 +121,21 @@ export async function GET() {
       },
     })
 
-    // ===== 7. Clean up expired rate limits =====
+    // ===== 7. Delete expired group messages (7-day auto-delete) =====
+    // Group messages auto-delete after 7 days (hard_delete_at is non-nullable on GroupMessage)
+    const expiredGroupMessages = await db.groupMessage.deleteMany({
+      where: {
+        hard_delete_at: { lt: now },
+      },
+    })
+
+    // ===== 8. Clean up expired rate limits =====
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
     const expiredRateLimits = await db.rateLimit.deleteMany({
       where: { hour_window_start: { lt: oneHourAgo } },
     })
 
-    // ===== 8. Reset not_today for expired users =====
+    // ===== 9. Reset not_today for expired users =====
     const usersWithExpiredNotToday = await db.user.findMany({
       where: {
         not_today: true,
@@ -125,7 +158,7 @@ export async function GET() {
       resetNotToday = result.count
     }
 
-    // ===== 9. Send scheduled broadcasts that are due =====
+    // ===== 10. Send scheduled broadcasts that are due =====
     const CHAT_SERVICE_URL = process.env.CHAT_SERVICE_URL || ''
     const scheduledBroadcasts = await db.adminBroadcast.findMany({
       where: {
@@ -194,7 +227,7 @@ export async function GET() {
       }
     }
 
-    // ===== 10. Phase 8: Permanently delete soft-deleted accounts past grace period =====
+    // ===== 11. Phase 8: Permanently delete soft-deleted accounts past grace period =====
     const softDeletedUsers = await db.user.findMany({
       where: {
         is_banned: true,
@@ -252,6 +285,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       staleOnlineCleaned: staleOnlineUsers.count,
+      staleInAppCleaned: staleInAppUsers.count,
       expiredStatuses,
       expiredAutoDeleteMessages: expiredAutoDelete.count,
       expiredHardDeleteMessages: expiredHardDelete.count,
@@ -259,6 +293,7 @@ export async function GET() {
       expiredBroadcasts: expiredBroadcasts.count,
       expiredPosts: expiredPosts.count,
       expiredComments: expiredComments.count,
+      expiredGroupMessages: expiredGroupMessages.count,
       expiredRateLimits: expiredRateLimits.count,
       resetNotToday,
       sentScheduledBroadcasts: sentBroadcasts,

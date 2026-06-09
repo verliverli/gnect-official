@@ -36,7 +36,7 @@ export function StarRating({ userId, currentRating, avgRating, ratingCount, size
       if (data.ok) {
         setMyRating(stars)
         onRated?.(stars)
-        toast.success(stars === currentRating ? 'Rating removed' : `Rated ${stars}⭐`)
+        toast.success(stars === currentRating ? 'Rating removed' : `Rated ${stars} stars`)
       } else {
         setRatingError(data.error || 'Failed to rate')
         toast.error(data.error || 'Failed to rate')

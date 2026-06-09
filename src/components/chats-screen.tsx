@@ -6,7 +6,7 @@ import {
   MessageCircle, Search, ArrowLeft, Send, ImagePlus,
   Check, CheckCheck, EyeOff, Lock, ChevronDown, Shield,
   Ban, Flag, XCircle, Camera, Reply, Trash2,
-  Ghost, Loader2, X, Smile, Image, Link2, Star
+  Ghost, Loader2, X, Smile, Image, Link2, Star, Mic
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,8 @@ import { toast } from 'sonner'
 import { io, Socket } from 'socket.io-client'
 import { ChatSelfDestruct } from '@/components/chat-self-destruct'
 import { PhotoViewer } from '@/components/photo-viewer'
+import { VoiceNoteRecorder } from '@/components/voice-note-recorder'
+import { VoiceNotePlayer } from '@/components/voice-note-player'
 // StarRating removed — inline star icons used in chat header instead
 
 // ============================================
@@ -77,6 +79,25 @@ interface ChatMessage {
 }
 
 // ============================================
+// Helper: reply preview text
+// Shows "Photo" or "Voice note" for media messages
+// instead of raw content (which is null for photos or a number for voice notes)
+// ============================================
+
+function getReplyPreviewText(msg: ChatMessage | null): string {
+  if (!msg) return '[Message removed]'
+  if (msg.content === 'Message was unsent') return 'Message was unsent'
+  // Media-type labels — always show these for media messages
+  if (msg.media_type === 'voice_note') return 'Voice note'
+  if (msg.media_type === 'photo') return 'Photo'
+  if (msg.media_type === 'view_once_photo') return 'Locked photo'
+  // If no content but has some other media_type
+  if (!msg.content && msg.media_type) return '[Message removed]'
+  // Text message — show truncated content
+  return msg.content?.slice(0, 60) || '[Message removed]'
+}
+
+// ============================================
 // Helper: relative time
 // ============================================
 
@@ -112,10 +133,10 @@ function formatTime(dateStr: string): string {
 }
 
 // ============================================
-// ViewOncePhoto Component — Privacy-first 🔏
+// ViewOncePhoto Component — Privacy-first
 // ALL photos are view-once. No "normal photo" mode.
-// Sender: "🔏 Photo sent" → "🔏 Viewed & deleted" (after receiver views & deletes)
-// Receiver: "🔏 Tap to view" → "🔏 Photo was viewed and deleted" (after viewing & deleting)
+// Sender: "Photo sent" → "Viewed & deleted" (after receiver views & deletes)
+// Receiver: "Tap to view" → "Photo was viewed and deleted" (after viewing & deleting)
 // ============================================
 
 const ViewOncePhoto = memo(function ViewOncePhoto({
@@ -139,20 +160,20 @@ const ViewOncePhoto = memo(function ViewOncePhoto({
             <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
               <Lock className="w-5 h-5 text-muted-foreground/40" />
             </div>
-            <span className="text-xs text-muted-foreground/50 font-medium">🔏 Viewed & deleted</span>
+            <span className="text-xs text-muted-foreground/50 font-medium">Viewed & deleted</span>
             <span className="text-[10px] text-muted-foreground/30">Privacy-first photo</span>
           </div>
         </div>
       )
     }
-    // Sender: not yet viewed → "🔏 Photo sent" with subtle card
+    // Sender: not yet viewed → "Photo sent" with subtle card
     return (
       <div className="relative rounded-xl overflow-hidden bg-secondary/50 border border-border/50 max-w-[240px]">
         <div className="aspect-[3/4] flex flex-col items-center justify-center gap-2 p-4">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Lock className="w-5 h-5 text-primary" />
           </div>
-          <span className="text-xs text-primary font-medium">🔏 Photo sent</span>
+          <span className="text-xs text-primary font-medium">Photo sent</span>
           <span className="text-[10px] text-muted-foreground/50">Privacy-first photo</span>
         </div>
       </div>
@@ -165,12 +186,12 @@ const ViewOncePhoto = memo(function ViewOncePhoto({
     return (
       <div className="flex items-center gap-1.5 max-w-[240px] py-1">
         <Lock className="w-3 h-3 text-muted-foreground/30 shrink-0" />
-        <span className="text-xs text-muted-foreground/40">🔏 Photo was viewed and deleted</span>
+        <span className="text-xs text-muted-foreground/40">Photo was viewed and deleted</span>
       </div>
     )
   }
 
-  // Receiver: not yet viewed → "🔏 Tap to view" card
+  // Receiver: not yet viewed → "Tap to view" card
   const photoUrl = message.media_url ? getMediaUrl(message.media_url) : null
   return (
     <button
@@ -185,7 +206,7 @@ const ViewOncePhoto = memo(function ViewOncePhoto({
         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
           <Lock className="w-5 h-5 text-primary" />
         </div>
-        <span className="text-xs text-primary font-medium">🔏 Tap to view</span>
+        <span className="text-xs text-primary font-medium">Tap to view</span>
         <span className="text-[10px] text-muted-foreground/50">Privacy-first photo</span>
       </div>
     </button>
@@ -369,6 +390,48 @@ const ChatBubble = memo(function ChatBubble({
     )
   }
 
+  // Voice note (P1.12)
+  if (message.media_type === 'voice_note') {
+    return (
+      <div
+        className={`flex ${isMine ? 'justify-end' : 'justify-start'} mb-1 ${isSelected ? 'ring-2 ring-primary/60 rounded-xl' : ''} gnect-bubble-enter`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => { setSwipeX(0); setIsSwiping(false); mouseStartRef.current = null; if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null } }}
+        onContextMenu={handleContextMenu}
+        style={{ transform: `translateX(${swipeX}px)`, transition: isSwiping ? 'none' : 'transform 0.2s ease-out' }}
+      >
+        {/* Swipe reply indicator */}
+        {swipeX > REPLY_ICON_SHOW && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full pr-2 flex items-center">
+            <Reply className="w-5 h-5 text-primary" />
+          </div>
+        )}
+        <div className="relative">
+          {/* Reply preview */}
+          {replyTo && (
+            <div className={`text-[10px] px-2 py-1 rounded-t-xl mb-0.5 ${
+              isMine ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground'
+            }`}>
+              <span className="font-medium truncate block">
+                {getReplyPreviewText(replyTo)}
+              </span>
+            </div>
+          )}
+          <VoiceNotePlayer message={message} isMine={isMine} />
+          <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-[10px] text-muted-foreground/50">{formatTime(message.sent_at)}</span>
+            {isMine && readReceipt}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Regular photo
   if (message.media_type === 'photo' && message.media_url) {
     const photoUrl = getMediaUrl(message.media_url)
@@ -398,7 +461,7 @@ const ChatBubble = memo(function ChatBubble({
               isMine ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground'
             }`}>
               <span className="font-medium truncate block">
-                {replyTo ? (replyTo.content === 'Message was unsent' ? 'Message was unsent' : (!replyTo.content && replyTo.media_type ? '[Message removed]' : replyTo.content?.slice(0, 50) || 'Photo')) : '[Message removed]'}
+                {getReplyPreviewText(replyTo)}
               </span>
             </div>
           )}
@@ -460,7 +523,7 @@ const ChatBubble = memo(function ChatBubble({
             isMine ? 'bg-primary/10 text-primary/80' : 'bg-secondary/80 text-muted-foreground'
           }`}>
             <span className="font-medium truncate block">
-              {replyTo ? (replyTo.content === 'Message was unsent' ? 'Message was unsent' : (!replyTo.content && replyTo.media_type ? '[Message removed]' : replyTo.content?.slice(0, 60) || 'Photo')) : '[Message removed]'}
+              {getReplyPreviewText(replyTo)}
             </span>
           </div>
         )}
@@ -490,17 +553,40 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   // Read cached chat list from store for instant rendering
   const cachedChatList = dataStore((s) => s.chatList)
 
-  // Phase 6: Self-destruct timer state
-  const [selfDestructHours, setSelfDestructHours] = useState<number | null>(null)
+  // ⚡ SPOTLIGHT INSTANT NAVIGATION — Skip chat list, go directly to messaging
+  // When openChatWithUserId is set (from Spotlight MESSAGE button), initialize in 'chat' view
+  // with optimistic user data from preload or discover cache. No flash of chat list!
+  const _spotlightPreload = openChatWithUserId ? dataStore.getState().getChatPreload(openChatWithUserId) : null
+  const _optimisticUser = (() => {
+    if (!openChatWithUserId) return null
+    // Best: from preload cache (has chatId, full user data, messages)
+    if (_spotlightPreload?.otherUser) return _spotlightPreload.otherUser
+    // Good: from discover data in dataStore (has name/avatar from nearby/all lists)
+    const discoverUser = dataStore.getState().nearbyUsers.find(u => u.id === openChatWithUserId)
+      || dataStore.getState().allUsers.find(u => u.id === openChatWithUserId)
+    if (discoverUser) {
+      return {
+        id: discoverUser.id,
+        nickname: discoverUser.nickname,
+        photo: discoverUser.photos?.[0] ? getMediaUrl(discoverUser.photos[0].catbox_url) : null,
+        is_online: discoverUser.is_online,
+      }
+    }
+    // Fallback: generic placeholder (handleOpenChatWithUser will replace with real data)
+    return { id: openChatWithUserId, nickname: 'User', photo: null, is_online: false }
+  })()
+
+  // Phase 6: Self-destruct timer state — initialize from preload if available
+  const [selfDestructHours, setSelfDestructHours] = useState<number | null>(_spotlightPreload?.selfDestructHours ?? null)
 
   // Phase 6: Block/Report confirmation dialogs
   const [showBlockConfirm, setShowBlockConfirm] = useState(false)
   const [showReportConfirm, setShowReportConfirm] = useState<string | null>(null)
 
-  // View state
-  const [view, setView] = useState<'list' | 'chat'>('list')
-  const [activeChatId, setActiveChatId] = useState<string | null>(null)
-  const [activeChatUser, setActiveChatUser] = useState<{ id: string; nickname: string; photo: string | null; is_online: boolean } | null>(null)
+  // View state — If opening from Spotlight, start directly in 'chat' view (skip list!)
+  const [view, setView] = useState<'list' | 'chat'>(openChatWithUserId ? 'chat' : 'list')
+  const [activeChatId, setActiveChatId] = useState<string | null>(_spotlightPreload?.chatId || null)
+  const [activeChatUser, setActiveChatUser] = useState<{ id: string; nickname: string; photo: string | null; is_online: boolean } | null>(_optimisticUser)
 
   // Chat list state — initialize from cache for instant rendering
   const [chats, setChats] = useState<ChatListItem[]>(cachedChatList)
@@ -509,11 +595,13 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   const [chatsHasMore, setChatsHasMore] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Messages state
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  // Messages state — initialize from preload if available (instant messages from Spotlight!)
+  const [messages, setMessages] = useState<ChatMessage[]>(_spotlightPreload?.messages ? _spotlightPreload.messages as ChatMessage[] : [])
+  // ⚡ From Spotlight: NEVER show loading spinner — show "Say hey" empty state instantly
+  // If no preload yet, the chat will be created in background and messages will appear when ready
   const [messagesLoading, setMessagesLoading] = useState(false)
-  const [messagesCursor, setMessagesCursor] = useState<string | null>(null)
-  const [messagesHasMore, setMessagesHasMore] = useState(false)
+  const [messagesCursor, setMessagesCursor] = useState<string | null>(_spotlightPreload?.nextCursor || null)
+  const [messagesHasMore, setMessagesHasMore] = useState(!!_spotlightPreload?.nextCursor)
 
   // Input state
   const [messageText, setMessageText] = useState('')
@@ -526,6 +614,10 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
 
+  // Voice note recording state — P1.12
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false)
+  const [uploadingVoice, setUploadingVoice] = useState(false)
+
   // Typing indicator — Bug 8: scoped to chat ID, not just boolean
   const [typingChatId, setTypingChatId] = useState<string | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -534,7 +626,7 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null)
 
   // Inline rating in chat header (replaces popup)
-  const [chatRating, setChatRating] = useState<number | null>(null)
+  const [chatRating, setChatRating] = useState<number | null>(_spotlightPreload?.myRating ?? null)
 
   // Photo viewer — Bug 3: modern animated viewer with view-once support
   const [viewerImageUrl, setViewerImageUrl] = useState<string | null>(null)
@@ -725,6 +817,8 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
         setView('list')
         setActiveChatId(null)
         setActiveChatUser(null)
+        // P1.13: Dispatch active chat cleared for screenshot notification
+        window.dispatchEvent(new CustomEvent('gnect-active-chat-change', { detail: { chatId: null } }))
         toast('Chat was deleted by the other person', { icon: <Lock className="w-4 h-4" /> })
       }
       // Refresh chat list to remove the deleted chat
@@ -824,15 +918,120 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   // Open Chat (from external trigger like Spotlight)
   // ============================================
 
+  // Track whether we already initialized from preload on mount (skip redundant init)
+  const spotlightInitRef = useRef(!!_spotlightPreload?.chatId)
+
   useEffect(() => {
     if (openChatWithUserId && currentUser) {
+      // ⚡ If we already initialized from preload on mount, just do cleanup + background refresh
+      if (spotlightInitRef.current && _spotlightPreload?.chatId) {
+        const chatId = _spotlightPreload.chatId
+
+        // 🚫 DON'T add empty chats to local list — only chats with messages belong there
+        // The chat will be added to the list automatically when fetchChats runs after a message is sent
+
+        // Dispatch active chat change for screenshot notification
+        window.dispatchEvent(new CustomEvent('gnect-active-chat-change', { detail: { chatId } }))
+
+        // Clean up preload cache — no longer needed
+        dataStore.getState().clearChatPreload(openChatWithUserId)
+
+        // Notify AppShell that the chat has been opened
+        onChatOpened?.()
+
+        // Scroll to bottom of messages
+        requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView())
+
+        // Background refresh: silently re-fetch messages to ensure we have the latest
+        // (in case new messages arrived between preload and click)
+        const preloadMsgCount = _spotlightPreload.messages?.length || 0
+        fetch(`/api/chat/${chatId}/open`, { credentials: 'same-origin' })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.ok) {
+              const freshMsgs = d.data.messages || []
+              // Only update if there are new messages (don't re-render for same data)
+              if (freshMsgs.length > preloadMsgCount) {
+                setMessages(freshMsgs)
+                setMessagesCursor(d.data.nextCursor || null)
+                setMessagesHasMore(!!d.data.nextCursor)
+                setSelfDestructHours(d.data.selfDestructHours)
+                setChatRating(d.data.myRating)
+                dataStore.getState().setChatMessages(chatId, freshMsgs)
+                requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView())
+              }
+            }
+          })
+          .catch(() => {})
+
+        return // ✅ Done — already initialized from preload on mount!
+      }
+
+      // No preload or not initialized — use original flow (API calls)
       handleOpenChatWithUser(openChatWithUserId)
     }
   }, [openChatWithUserId, currentUser])
 
   const handleOpenChatWithUser = async (userId: string) => {
+    // ⚡ INSTANT: Check if Spotlight already preloaded this chat
+    const preloaded = dataStore.getState().getChatPreload(userId)
+
+    if (preloaded && !preloaded.error && preloaded.chatId) {
+      // ✅ PRELOADED — Open chat INSTANTLY with cached data, zero API calls
+      const { chatId, otherUser, messages, nextCursor, selfDestructHours, myRating } = preloaded
+
+      // 🚫 DON'T add empty chats to local list — only chats with messages belong there
+      // The chat will appear in the list after the first message is sent (fetchChats refreshes from API)
+
+      // Open chat with PRELOADED data — instant render!
+      setActiveChatId(chatId)
+      setActiveChatUser(otherUser)
+      setView('chat')
+      window.dispatchEvent(new CustomEvent('gnect-active-chat-change', { detail: { chatId } }))
+      setMessagesCursor(nextCursor)
+      setMessagesHasMore(!!nextCursor)
+      setReplyTo(null)
+      setTypingChatId(null)
+      setSelectedMessage(null)
+      setChatRating(myRating)
+      setSelfDestructHours(selfDestructHours)
+      setMessages(messages)
+      setMessagesLoading(false)
+      requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView())
+
+      // Clean up preload cache — no longer needed
+      dataStore.getState().clearChatPreload(userId)
+
+      // Notify AppShell that the chat has been opened
+      onChatOpened?.()
+
+      // Background refresh: silently re-fetch messages to ensure we have the latest
+      // (in case new messages arrived between preload and click)
+      fetch(`/api/chat/${chatId}/open`, { credentials: 'same-origin' })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.ok) {
+            const freshMsgs = d.data.messages || []
+            // Only update if there are new messages (don't re-render for same data)
+            if (freshMsgs.length > messages.length) {
+              setMessages(freshMsgs)
+              setMessagesCursor(d.data.nextCursor || null)
+              setMessagesHasMore(!!d.data.nextCursor)
+              setSelfDestructHours(d.data.selfDestructHours)
+              setChatRating(d.data.myRating)
+              dataStore.getState().setChatMessages(chatId, freshMsgs)
+              requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView())
+            }
+          }
+        })
+        .catch(() => {})
+
+      return // ✅ Done — no API calls needed for initial render!
+    }
+
+    // Fallback: Preload not available — use original flow (chat create + profile + open)
+    // This handles: first visit, expired preload, direct chat list click
     try {
-      // Fire both API calls in parallel — chat create + profile fetch are independent
       const [chatRes, profileRes] = await Promise.all([
         fetch('/api/chat/create', {
           method: 'POST',
@@ -856,21 +1055,10 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
             }
           : { id: userId, nickname: 'User', photo: null, is_online: false }
 
-        // Add to local chat list immediately so it shows when returning to list
-        const newChatItem: ChatListItem = {
-          id: data.data.id,
-          otherUser,
-          lastMessage: null,
-          unreadCount: 0,
-          last_message_at: new Date().toISOString(),
-        }
-        setChats((prev) => {
-          // Avoid duplicate
-          if (prev.some((c) => c.id === data.data.id)) return prev
-          return [newChatItem, ...prev]
-        })
+        // 🚫 DON'T add empty chats to local list — only chats with messages belong there
+        // The chat will appear in the list after the first message is sent
 
-        openChat(data.data.id, otherUser)
+        openChat(data.data.id, otherUser, true) // skipLoading=true → show "Say hey" instead of spinner
         // Notify AppShell that the chat has been opened so it clears chatWithUserId
         onChatOpened?.()
       } else {
@@ -885,10 +1073,12 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   // Open/Close Chat
   // ============================================
 
-  const openChat = useCallback((chatId: string, otherUser: ChatListItem['otherUser']) => {
+  const openChat = useCallback((chatId: string, otherUser: ChatListItem['otherUser'], skipLoading = false) => {
     setActiveChatId(chatId)
     setActiveChatUser(otherUser)
     setView('chat')
+    // P1.13: Dispatch active chat change for screenshot notification
+    window.dispatchEvent(new CustomEvent('gnect-active-chat-change', { detail: { chatId } }))
     setMessagesCursor(null)
     setReplyTo(null)
     setTypingChatId(null)
@@ -903,7 +1093,9 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
       requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView())
     } else {
       setMessages([])
-      setMessagesLoading(true)
+      // ⚡ From Spotlight: skip loading spinner — show "Say hey" empty state instead
+      // The API fetch will populate messages when ready
+      setMessagesLoading(!skipLoading)
     }
 
     // SINGLE combined API call — replaces 4 separate calls for maximum speed
@@ -944,6 +1136,13 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
     if (activeChatId && messages.length > 0) {
       dataStore.getState().setChatMessages(activeChatId, messages)
     }
+    // 🚫 If this chat has NO messages, remove it from local list
+    // Empty chats shouldn't appear in chat list (only chats with actual messages)
+    if (activeChatId && messages.length === 0) {
+      setChats((prev) => prev.filter((c) => c.id !== activeChatId))
+    }
+    // P1.13: Dispatch active chat cleared for screenshot notification
+    window.dispatchEvent(new CustomEvent('gnect-active-chat-change', { detail: { chatId: null } }))
     setActiveChatId(null)
     setActiveChatUser(null)
     setView('list')
@@ -1139,7 +1338,36 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
           message: realMsg,
         })
 
-        // Update chat list with last message
+        // ✅ Add this chat to local list NOW (first message sent!)
+        // This ensures the chat appears in the list when going back,
+        // even before the API refresh completes
+        if (activeChatUser) {
+          const chatItem: ChatListItem = {
+            id: activeChatId,
+            otherUser: activeChatUser,
+            lastMessage: {
+              content: textToSend,
+              sent_at: data.data.sent_at,
+              sender_id: currentUser!.id,
+              media_type: null,
+              is_view_once: false,
+            },
+            unreadCount: 0,
+            last_message_at: data.data.sent_at,
+          }
+          setChats((prev) => {
+            const existing = prev.findIndex((c) => c.id === activeChatId)
+            if (existing >= 0) {
+              // Update existing entry with new last message
+              const updated = [...prev]
+              updated[existing] = { ...updated[existing], lastMessage: chatItem.lastMessage, last_message_at: chatItem.last_message_at }
+              return updated
+            }
+            return [chatItem, ...prev]
+          })
+        }
+
+        // Update chat list from server
         fetchChats(true)
       } else {
         // Server rejected — remove optimistic message and show error
@@ -1271,6 +1499,32 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
           message: newMsg,
         })
 
+        // ✅ Add this chat to local list NOW (first message — photo sent!)
+        if (activeChatUser) {
+          const chatItem: ChatListItem = {
+            id: activeChatId,
+            otherUser: activeChatUser,
+            lastMessage: {
+              content: null,
+              sent_at: data.data.sent_at,
+              sender_id: currentUser!.id,
+              media_type: mediaType,
+              is_view_once: isViewOnce,
+            },
+            unreadCount: 0,
+            last_message_at: data.data.sent_at,
+          }
+          setChats((prev) => {
+            const existing = prev.findIndex((c) => c.id === activeChatId)
+            if (existing >= 0) {
+              const updated = [...prev]
+              updated[existing] = { ...updated[existing], lastMessage: chatItem.lastMessage, last_message_at: chatItem.last_message_at }
+              return updated
+            }
+            return [chatItem, ...prev]
+          })
+        }
+
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       } else {
         toast.error(data.error || 'Failed to send photo')
@@ -1288,6 +1542,113 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
     setPhotoPreview(null)
     setPhotoFile(null)
     if (photoInputRef.current) photoInputRef.current.value = ''
+  }, [])
+
+  // ============================================
+  // Voice Note Send (P1.12) — Record → Upload → Send
+  // ============================================
+
+  const handleVoiceNoteSend = useCallback(async (audioBlob: Blob, durationSeconds: number) => {
+    if (!activeChatId) return
+
+    setIsRecordingVoice(false)
+    setUploadingVoice(true)
+
+    try {
+      // Step 1: Upload voice note to Telegram
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'voice_note.webm')
+      formData.append('duration', durationSeconds.toString())
+
+      const uploadRes = await fetch(`/api/chat/${activeChatId}/upload-voice`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+      })
+      const uploadData = await uploadRes.json()
+
+      if (!uploadData.ok) {
+        toast.error(uploadData.error || 'Voice note upload failed')
+        return
+      }
+
+      // Step 2: Send message with voice note
+      const res = await fetch(`/api/chat/${activeChatId}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          media_url: uploadData.data.url,
+          media_type: 'voice_note',
+          content: durationSeconds.toString(), // Store duration in content field
+          reply_to_id: replyTo?.id || null,
+        }),
+        credentials: 'same-origin',
+      })
+      const data = await res.json()
+
+      if (data.ok) {
+        const newMsg: ChatMessage = {
+          id: data.data.id,
+          sender_id: currentUser!.id,
+          content: durationSeconds.toString(),
+          media_url: uploadData.data.url,
+          media_type: 'voice_note',
+          is_view_once: false,
+          view_once_duration: null,
+          viewed: false,
+          delivered: false,
+          reply_to_id: replyTo?.id || null,
+          sent_at: data.data.sent_at,
+        }
+
+        setMessages((prev) => [...prev, newMsg])
+        setReplyTo(null)
+
+        socketRef.current?.emit('send-message', {
+          chatId: activeChatId,
+          message: newMsg,
+        })
+
+        // ✅ Add chat to local list (same as text message)
+        if (activeChatUser) {
+          const chatItem: ChatListItem = {
+            id: activeChatId,
+            otherUser: activeChatUser,
+            lastMessage: {
+              content: null,
+              sent_at: data.data.sent_at,
+              sender_id: currentUser!.id,
+              media_type: 'voice_note',
+              is_view_once: false,
+            },
+            unreadCount: 0,
+            last_message_at: data.data.sent_at,
+          }
+          setChats((prev) => {
+            const existing = prev.findIndex((c) => c.id === activeChatId)
+            if (existing >= 0) {
+              const updated = [...prev]
+              updated[existing] = { ...updated[existing], lastMessage: chatItem.lastMessage, last_message_at: chatItem.last_message_at }
+              return updated
+            }
+            return [chatItem, ...prev]
+          })
+        }
+
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        fetchChats(true)
+      } else {
+        toast.error(data.error || 'Failed to send voice note')
+      }
+    } catch {
+      toast.error('Network error')
+    } finally {
+      setUploadingVoice(false)
+    }
+  }, [activeChatId, currentUser, replyTo, activeChatUser, fetchChats])
+
+  const handleVoiceNoteCancel = useCallback(() => {
+    setIsRecordingVoice(false)
   }, [])
 
   // ============================================
@@ -1470,6 +1831,19 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   // RENDER: Chat List
   // ============================================
 
+  // Pull-to-refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const pullStartY = useRef(0)
+  const pullDistance = useRef(0)
+  const isPulling = useRef(false)
+
+  const handlePullRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    appCache.getState().setTimestamp('chatList', 0) // Force stale
+    await fetchChats(true)
+    setIsRefreshing(false)
+  }, [fetchChats, appCache])
+
   const renderChatList = () => (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -1491,8 +1865,42 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
         </div>
       </div>
 
-      {/* Chat List */}
-      <div ref={chatListRef} className="flex-1 overflow-y-auto gnect-scroll">
+      {/* Chat List with Pull-to-Refresh */}
+      <div
+        ref={chatListRef}
+        className="flex-1 overflow-y-auto gnect-scroll"
+        onTouchStart={(e) => {
+          const el = e.currentTarget
+          if (el.scrollTop <= 0) {
+            pullStartY.current = e.touches[0].clientY
+            isPulling.current = true
+          }
+        }}
+        onTouchMove={(e) => {
+          if (!isPulling.current) return
+          const el = e.currentTarget
+          if (el.scrollTop > 0) {
+            isPulling.current = false
+            pullDistance.current = 0
+            return
+          }
+          pullDistance.current = Math.max(0, e.touches[0].clientY - pullStartY.current)
+        }}
+        onTouchEnd={() => {
+          if (isPulling.current && pullDistance.current > 80 && !isRefreshing) {
+            handlePullRefresh()
+          }
+          isPulling.current = false
+          pullDistance.current = 0
+        }}
+      >
+        {/* Pull-to-refresh indicator */}
+        {isRefreshing && (
+          <div className="flex items-center justify-center py-3 gap-2 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-xs font-medium">Refreshing...</span>
+          </div>
+        )}
         {chatsLoading ? (
           <div className="px-4 space-y-3 py-2">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -1527,6 +1935,7 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
                 whileTap={{ scale: 0.98 }}
                 onClick={() => openChat(chat.id, chat.otherUser)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-card/50 active:bg-card/80 transition-colors rounded-xl"
+                aria-label={`Chat with ${chat.otherUser.nickname}`}
               >
                 {/* Avatar */}
                 <div className="relative shrink-0">
@@ -1575,6 +1984,8 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
                             ? <><EyeOff className="w-3.5 h-3.5 inline" /> View-once photo</>
                             : chat.lastMessage.media_type === 'photo'
                             ? <><Camera className="w-3.5 h-3.5 inline" /> Photo</>
+                            : chat.lastMessage.media_type === 'voice_note'
+                            ? <><Mic className="w-3.5 h-3.5 inline" /> Voice note</>
                             : chat.lastMessage.content || 'Photo'}
                         </>
                       ) : (
@@ -1934,7 +2345,7 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] text-primary font-medium">Replying</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {replyTo.content?.slice(0, 50) || 'Photo'}
+                  {getReplyPreviewText(replyTo)}
                 </p>
               </div>
               <button
@@ -1956,6 +2367,7 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
               key={qr}
               onClick={() => handleQuickReply(qr)}
               className="shrink-0 px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition-all whitespace-nowrap"
+              aria-label={`Quick reply: ${qr}`}
             >
               {qr}
             </button>
@@ -1965,10 +2377,10 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
 
       {/* Message Input — WhatsApp-style: Enter = newline, send button only */}
       <div className="shrink-0 gnect-glass border-t border-border/50 px-3 py-2 safe-bottom flex items-end gap-2">
-        {/* Photo button — all photos are privacy-first 🔏 */}
+        {/* Photo button — all photos are privacy-first */}
         <button
           onClick={() => photoInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || isRecordingVoice}
           className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 active:bg-secondary transition-colors gnect-press"
           aria-label="Send privacy-first photo"
         >
@@ -1979,43 +2391,71 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
           )}
         </button>
 
-        {/* Text input — auto-resize textarea, Enter = newline */}
-        <div className="flex-1 min-w-0">
-          <textarea
-            value={messageText}
-            onChange={(e) => {
-              handleTyping(e.target.value)
-              // Auto-resize: reset height then set to scrollHeight
-              e.target.style.height = 'auto'
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-            }}
-            placeholder="Type a message..."
-            className={`w-full resize-none rounded-2xl text-sm px-4 py-2.5 bg-secondary/50 border-0 outline-none focus:ring-1 max-h-[120px] overflow-y-auto gnect-scroll gnect-input-responsive ${
-              containsLink(messageText) ? 'focus:ring-red-400' : 'focus:ring-primary/30'
-            }`}
-            maxLength={2000}
-            disabled={sending}
-            rows={1}
-            style={{ height: '40px' }}
+        {/* Voice recording or text input */}
+        {isRecordingVoice ? (
+          <VoiceNoteRecorder
+            onSend={handleVoiceNoteSend}
+            onCancel={handleVoiceNoteCancel}
           />
-          {containsLink(messageText) && (
-            <p className="text-[10px] text-red-400 mt-0.5 px-1 flex items-center gap-0.5"><Link2 className="w-3 h-3" /> Links are not allowed</p>
-          )}
-        </div>
+        ) : (
+          <>
+            {/* Text input — auto-resize textarea, Enter = newline */}
+            <div className="flex-1 min-w-0">
+              <textarea
+                value={messageText}
+                onChange={(e) => {
+                  handleTyping(e.target.value)
+                  // Auto-resize: reset height then set to scrollHeight
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                }}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && messageText.trim() && !sending && !containsLink(messageText)) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                placeholder="Type a message..."
+                aria-label="Type a message"
+                className={`w-full resize-none rounded-2xl text-sm px-4 py-2.5 bg-secondary/50 border-0 outline-none focus:ring-1 max-h-[120px] overflow-y-auto gnect-scroll gnect-input-responsive ${
+                  containsLink(messageText) ? 'focus:ring-red-400' : 'focus:ring-primary/30'
+                }`}
+                maxLength={2000}
+                disabled={sending || uploadingVoice}
+                rows={1}
+                style={{ height: '40px' }}
+              />
+              {containsLink(messageText) && (
+                <p className="text-[10px] text-red-400 mt-0.5 px-1 flex items-center gap-0.5"><Link2 className="w-3 h-3" /> Links are not allowed</p>
+              )}
+            </div>
 
-        {/* Send button */}
-        <button
-          onClick={handleSend}
-          disabled={!messageText.trim() || sending || containsLink(messageText)}
-          className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-all gnect-btn-bounce gnect-press ${
-            messageText.trim()
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'bg-secondary text-muted-foreground'
-          }`}
-          aria-label="Send message"
-        >
-          <Send className="w-4 h-4" />
-        </button>
+            {/* Mic button (when no text) or Send button (when text typed) */}
+            {messageText.trim() ? (
+              <button
+                onClick={handleSend}
+                disabled={sending || containsLink(messageText)}
+                className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-all gnect-btn-bounce gnect-press bg-primary text-primary-foreground shadow-sm"
+                aria-label="Send message"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsRecordingVoice(true)}
+                disabled={uploadingVoice}
+                className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 active:bg-primary/10 active:scale-90 transition-all gnect-press"
+                aria-label="Record voice note"
+              >
+                {uploadingVoice ? (
+                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                ) : (
+                  <Mic className="w-5 h-5 text-muted-foreground" />
+                )}
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       {/* Hidden photo input */}

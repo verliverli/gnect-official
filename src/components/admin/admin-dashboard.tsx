@@ -101,9 +101,9 @@ export function AdminDashboard() {
                 <div key={r.region} className="flex items-center gap-2">
                   <span className="text-sm shrink-0">{r.countryFlag}</span>
                   <span className="text-xs text-muted-foreground w-24 truncate shrink-0">{r.region}</span>
-                  <div className="flex-1 h-5 bg-secondary rounded-full overflow-hidden">
+                  <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary/60 rounded-full transition-all"
+                      className="h-full bg-primary rounded-full transition-all"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -132,9 +132,9 @@ export function AdminDashboard() {
                 <div key={c.country} className="flex items-center gap-2">
                   <span className="text-sm shrink-0">{c.flag}</span>
                   <span className="text-xs text-muted-foreground w-24 truncate shrink-0">{c.country}</span>
-                  <div className="flex-1 h-5 bg-secondary rounded-full overflow-hidden">
+                  <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary/60 rounded-full transition-all"
+                      className="h-full bg-primary rounded-full transition-all"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

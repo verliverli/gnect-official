@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Eye, EyeOff, Check, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Check, X, Loader2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -177,6 +177,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-xl font-bold">Create Account</h1>
+          <span className="text-xs text-muted-foreground flex items-center gap-1"><Lock className="w-3 h-3" /> Private. Anonymous. No email or phone needed.</span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

@@ -6,7 +6,8 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  const databaseUrl = process.env.DATABASE_URL
+  // Prefer TURSO_DATABASE_URL over DATABASE_URL (sandbox environments may override DATABASE_URL)
+  const databaseUrl = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL
   const authToken = process.env.DATABASE_AUTH_TOKEN
 
   if (!databaseUrl) {

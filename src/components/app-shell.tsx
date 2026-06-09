@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Bell, Shield, Compass, MessageCircle, Users, EyeOff, HelpCircle, BookOpen, LifeBuoy, Lightbulb, X, Gift, Ban } from 'lucide-react'
+import { Bell, Shield, Compass, MessageCircle, Users, EyeOff, HelpCircle, BookOpen, LifeBuoy, Lightbulb, X, Gift, Ban, Shuffle } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { io, Socket } from 'socket.io-client'
 import { GeometricAvatar } from '@/components/geometric-avatar'
@@ -15,6 +15,7 @@ import { SAFE_PAGES, getMediaUrl } from '@/lib/constants'
 import { DiscoverScreen } from '@/components/discover-screen'
 import { ChatsScreen } from '@/components/chats-screen'
 import { CommunityScreen } from '@/components/community-screen'
+import { MixerScreen } from '@/components/mixer-screen'
 import { ProfilePanel } from '@/components/profile-panel'
 import { NotificationCenter } from '@/components/notification-center'
 import { BroadcastOverlay } from '@/components/broadcast-overlay'
@@ -28,7 +29,7 @@ import { SupportScreen } from '@/components/support/support-screen'
 import { FeedbackForm } from '@/components/feedback-form'
 import { Button } from '@/components/ui/button'
 
-type Screen = 'discover' | 'community' | 'chats'
+type Screen = 'discover' | 'chats' | 'community' | 'mixer'
 
 export function AppShell() {
   const { user, disappearMode, setDisappearMode } = useAuthStore()
@@ -359,22 +360,20 @@ export function AppShell() {
     registerSW()
   }, [user])
 
-  // Heartbeat: keep is_online fresh in database
+  // Heartbeat: keep is_online + in_app_at fresh in database
   useEffect(() => {
     if (!user) return
 
     const heartbeat = () => {
-      fetch('/api/profile/online-status', {
+      fetch('/api/profile/heartbeat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, isOnline: true }),
         credentials: 'same-origin',
       }).catch(() => {})
     }
 
-    // Send heartbeat immediately and then every 30 seconds
+    // Send heartbeat immediately and then every 60 seconds
     heartbeat()
-    const interval = setInterval(heartbeat, 30000)
+    const interval = setInterval(heartbeat, 60000)
 
     // Mark offline when page is closed/navigated away
     const handleUnload = () => {
@@ -406,13 +405,19 @@ export function AppShell() {
       setShowScreenshotFlash(true)
       setTimeout(() => setShowScreenshotFlash(false), 2000)
 
-      fetch('/api/notifications/screenshot', {
+      // P1.13: Pass chatId if on chats screen so partner gets notified
+      const params = new URLSearchParams()
+      if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__gnectActiveChatId) {
+        params.set('chatId', String((window as unknown as Record<string, unknown>).__gnectActiveChatId))
+      }
+
+      fetch(`/api/notifications/screenshot?${params.toString()}`, {
         method: 'POST',
         credentials: 'same-origin',
       }).then(async (res) => {
         const data = await res.json()
-        if (!data.ok) {
-          toast.error(data.error || 'Failed to save')
+        if (!data.ok && !data.rateLimited) {
+          // Don't show error for rate-limited or missing chatId
         }
       }).catch(() => {})
     }
@@ -459,6 +464,23 @@ export function AppShell() {
       window.removeEventListener('focus', handleWindowFocus)
       document.removeEventListener('contextmenu', handleContextMenu)
     }
+  }, [user])
+
+  // P1.13: Listen for active chat changes from ChatsScreen
+  useEffect(() => {
+    if (!user) return
+
+    const handleActiveChatChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail?.chatId) {
+        ;(window as unknown as Record<string, unknown>).__gnectActiveChatId = detail.chatId
+      } else {
+        delete (window as unknown as Record<string, unknown>).__gnectActiveChatId
+      }
+    }
+
+    window.addEventListener('gnect-active-chat-change', handleActiveChatChange)
+    return () => window.removeEventListener('gnect-active-chat-change', handleActiveChatChange)
   }, [user])
 
   // Open chat with a specific user (from Spotlight Message button)
@@ -521,10 +543,11 @@ export function AppShell() {
         {/* Brand — triple-tap triggers panic (Phase 6) */}
         <div className="flex flex-col items-center" onClick={handleHeaderTripleTap}>
           <span className="text-sm font-bold tracking-widest text-primary">GNECT</span>
+          <span className="text-[8px] text-muted-foreground/50 tracking-wide">Private by Design</span>
           {/* 🆓 Free Test Version badge */}
           <span className="text-[8px] font-semibold tracking-wide text-primary/50 uppercase flex items-center gap-0.5"><Gift className="w-2 h-2" /> Free Test Version</span>
           {isAdmin && (
-            <span className="text-[9px] font-semibold tracking-wider text-primary/60 uppercase">Boss Mode</span>
+            <span className="text-[9px] font-semibold tracking-wider text-primary/70 uppercase flex items-center gap-0.5"><Shield className="w-2.5 h-2.5" /> Boss Mode</span>
           )}
           {/* Disappear mode indicator */}
           {disappearMode && (
@@ -578,19 +601,30 @@ export function AppShell() {
         </div>
       </header>
 
-      {/* Content Area — NO swipe, just tab switch — CSS fade for performance */}
+      {/* Content Area — Framer Motion tab transitions */}
       <div id="main-content" className="flex-1 min-h-0 relative overflow-hidden" role="main">
-        <div key={activeScreen} className="absolute inset-0 gnect-tab-fade">
-            <ErrorBoundary>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeScreen}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0"
+          >
+            <ErrorBoundary level="screen">
               {activeScreen === 'discover' ? (
                 <DiscoverScreen onOpenChat={openChatWithUser} />
+              ) : activeScreen === 'chats' ? (
+                <ChatsScreen key={chatKey} openChatWithUserId={chatWithUserId} onChatOpened={clearChatWithUser} onUnreadCountChange={setTotalUnread} />
               ) : activeScreen === 'community' ? (
                 <CommunityScreen />
               ) : (
-                <ChatsScreen key={chatKey} openChatWithUserId={chatWithUserId} onChatOpened={clearChatWithUser} onUnreadCountChange={setTotalUnread} />
+                <MixerScreen onUnreadCountChange={(count) => badgeStore.getState().setUnreadMixer(count)} />
               )}
             </ErrorBoundary>
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Bottom Tab Bar — WhatsApp dark style */}
@@ -604,36 +638,16 @@ export function AppShell() {
           }`}
           aria-label="Discover screen"
         >
-          <Compass className={`w-5 h-5 ${activeScreen === 'discover' ? 'text-primary' : ''}`} />
+          <motion.div animate={activeScreen === 'discover' ? { scale: [1, 1.15, 1] } : {}} transition={{ duration: 0.3 }} className="relative">
+            <Compass className={`w-5 h-5 ${activeScreen === 'discover' ? 'text-primary' : ''}`} />
+            {notifUnread > 0 && activeScreen !== 'discover' && (
+              <span className="absolute -top-1 -right-1 min-w-[6px] h-[6px] rounded-full bg-primary" />
+            )}
+          </motion.div>
           <span className={`text-[10px] font-semibold tracking-wide ${activeScreen === 'discover' ? 'text-primary' : ''}`}>
             Discover
           </span>
           {activeScreen === 'discover' && (
-            <div className="absolute top-0 left-2 right-2 h-0.5 bg-primary rounded-full gnect-tab-fade" />
-          )}
-        </button>
-        <button
-          onClick={() => {
-            setActiveScreen('community')
-            badgeStore.getState().resetCommunity() // Bug 6: reset community badge when tab opened
-          }}
-          className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[52px] transition-colors relative gnect-press ${
-            activeScreen === 'community' ? 'text-primary' : 'text-muted-foreground'
-          }`}
-          aria-label="Community screen"
-        >
-          <div className="relative">
-            <Users className={`w-5 h-5 ${activeScreen === 'community' ? 'text-primary' : ''}`} />
-            {badgeStore((s) => s.unreadCommunity) > 0 && (
-              <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
-                {badgeStore((s) => s.unreadCommunity) > 99 ? '99+' : badgeStore((s) => s.unreadCommunity)}
-              </span>
-            )}
-          </div>
-          <span className={`text-[10px] font-semibold tracking-wide ${activeScreen === 'community' ? 'text-primary' : ''}`}>
-            Community
-          </span>
-          {activeScreen === 'community' && (
             <div className="absolute top-0 left-2 right-2 h-0.5 bg-primary rounded-full gnect-tab-fade" />
           )}
         </button>
@@ -655,7 +669,9 @@ export function AppShell() {
           aria-label="Chats screen"
         >
           <div className="relative">
-            <MessageCircle className={`w-5 h-5 ${activeScreen === 'chats' ? 'text-primary' : ''}`} />
+            <motion.div animate={activeScreen === 'chats' ? { scale: [1, 1.15, 1] } : {}} transition={{ duration: 0.3 }}>
+              <MessageCircle className={`w-5 h-5 ${activeScreen === 'chats' ? 'text-primary' : ''}`} />
+            </motion.div>
             {totalUnread > 0 && (
               <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
                 {totalUnread > 99 ? '99+' : totalUnread}
@@ -666,6 +682,58 @@ export function AppShell() {
             Chats
           </span>
           {activeScreen === 'chats' && (
+            <div className="absolute top-0 left-2 right-2 h-0.5 bg-primary rounded-full gnect-tab-fade" />
+          )}
+        </button>
+        <button
+          onClick={() => {
+            setActiveScreen('community')
+            badgeStore.getState().resetCommunity() // Bug 6: reset community badge when tab opened
+          }}
+          className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[52px] transition-colors relative gnect-press ${
+            activeScreen === 'community' ? 'text-primary' : 'text-muted-foreground'
+          }`}
+          aria-label="Community screen"
+        >
+          <div className="relative">
+            <motion.div animate={activeScreen === 'community' ? { scale: [1, 1.15, 1] } : {}} transition={{ duration: 0.3 }}>
+              <Users className={`w-5 h-5 ${activeScreen === 'community' ? 'text-primary' : ''}`} />
+            </motion.div>
+            {badgeStore((s) => s.unreadCommunity) > 0 && (
+              <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                {badgeStore((s) => s.unreadCommunity) > 99 ? '99+' : badgeStore((s) => s.unreadCommunity)}
+              </span>
+            )}
+          </div>
+          <span className={`text-[10px] font-semibold tracking-wide ${activeScreen === 'community' ? 'text-primary' : ''}`}>
+            Community
+          </span>
+          {activeScreen === 'community' && (
+            <div className="absolute top-0 left-2 right-2 h-0.5 bg-primary rounded-full gnect-tab-fade" />
+          )}
+        </button>
+        <button
+          onClick={() => {
+            setActiveScreen('mixer')
+            badgeStore.getState().resetMixer()
+          }}
+          className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[52px] transition-colors relative gnect-press ${
+            activeScreen === 'mixer' ? 'text-primary' : 'text-muted-foreground'
+          }`}
+          aria-label="Mixer screen"
+        >
+          <div className="relative">
+            <motion.div animate={activeScreen === 'mixer' ? { scale: [1, 1.15, 1] } : {}} transition={{ duration: 0.3 }}>
+              <Shuffle className={`w-5 h-5 ${activeScreen === 'mixer' ? 'text-primary' : ''}`} />
+            </motion.div>
+            {badgeStore((s) => s.unreadMixer) > 0 && (
+              <span className="absolute -top-1.5 -right-2 min-w-[8px] h-[8px] rounded-full bg-primary" />
+            )}
+          </div>
+          <span className={`text-[10px] font-semibold tracking-wide ${activeScreen === 'mixer' ? 'text-primary' : ''}`}>
+            Mixer
+          </span>
+          {activeScreen === 'mixer' && (
             <div className="absolute top-0 left-2 right-2 h-0.5 bg-primary rounded-full gnect-tab-fade" />
           )}
         </button>

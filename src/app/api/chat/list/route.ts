@@ -15,8 +15,16 @@ export async function GET(request: NextRequest) {
     const limit = 20
 
     // Fetch chats where current user is a participant
+    // ONLY include chats that have at least one real message (not unsent/ghost-deleted)
+    // This prevents empty chats from Spotlight preload appearing in the chat list
     const where = {
       OR: [{ user1_id: user.id }, { user2_id: user.id }],
+      messages: {
+        some: {
+          is_unsent: false,
+          is_ghost_deleted: false,
+        },
+      },
       ...(cursor ? { id: { lt: cursor } } : {}),
     }
 

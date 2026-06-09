@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
-import { MEDIA_LIMITS } from "@/lib/constants"
+import { MEDIA_LIMITS, containsLink } from "@/lib/constants"
 import { createNotification } from "@/lib/notifications"
+import { checkActionRateLimit, incrementActionRateLimit } from "@/lib/rate-limit"
 
 // POST /api/chat/[chatId]/send — Send a message in a chat
 export async function POST(
@@ -33,6 +34,26 @@ export async function POST(
     if (chat.user1_id !== user.id && chat.user2_id !== user.id) {
       return NextResponse.json({ ok: false, error: "Not a participant of this chat" }, { status: 403 })
     }
+
+    // P1.6: Check block status (both directions) — blocked users cannot send messages
+    const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
+    const blockRecord = await db.block.findFirst({
+      where: {
+        OR: [
+          { blocker_id: user.id, blocked_id: otherUserId },
+          { blocker_id: otherUserId, blocked_id: user.id },
+        ],
+      },
+    })
+    if (blockRecord) {
+      return NextResponse.json({ ok: false, error: "Cannot send message to blocked user" }, { status: 403 })
+    }
+
+    // P1.5: Rate limit — DISABLED during free beta (will re-enable with premium)
+    // const canSend = await checkActionRateLimit(user.id, 'chat_send')
+    // if (!canSend) {
+    //   return NextResponse.json({ ok: false, error: "Rate limit exceeded. Please wait before sending more messages." }, { status: 429 })
+    // }
 
     // Parse body
     let body: {
@@ -71,16 +92,25 @@ export async function POST(
       )
     }
 
+    // P1.4: Server-side link validation — block URLs in messages
+    // Skip for voice notes — their content is a duration number, not user text
+    if (containsLink(content) && media_type !== "voice_note") {
+      return NextResponse.json(
+        { ok: false, error: "Links are not allowed in messages" },
+        { status: 400 }
+      )
+    }
+
     // Validate media_url
     if (media_url && typeof media_url !== "string") {
       return NextResponse.json({ ok: false, error: "media_url must be a string" }, { status: 400 })
     }
 
     // Validate media_type
-    const validMediaTypes = ["photo", "view_once_photo"]
+    const validMediaTypes = ["photo", "view_once_photo", "voice_note"]
     if (media_type && !validMediaTypes.includes(media_type)) {
       return NextResponse.json(
-        { ok: false, error: "media_type must be 'photo' or 'view_once_photo'" },
+        { ok: false, error: "media_type must be 'photo', 'view_once_photo', or 'voice_note'" },
         { status: 400 }
       )
     }
@@ -125,6 +155,9 @@ export async function POST(
     } else if (media_url && media_type === "photo") {
       // Regular photos: 30 min unopened (will be updated to 24h when opened)
       auto_delete_at = new Date(now.getTime() + MEDIA_LIMITS.UNOPENED_MEDIA_DELETE_MINUTES * 60 * 1000)
+    } else if (media_type === "voice_note") {
+      // P1.12: Voice notes auto-delete after 7 days
+      auto_delete_at = new Date(now.getTime() + MEDIA_LIMITS.VOICE_NOTE_DELETE_DAYS * 24 * 60 * 60 * 1000)
     }
     // Text messages: no auto_delete_at (only hard_delete_at at 7 days)
 
@@ -161,8 +194,11 @@ export async function POST(
       data: { last_message_at: now },
     })
 
+    // P1.5: Rate limit counter — DISABLED during free beta
+    // await incrementActionRateLimit(user.id, 'chat_send')
+
     // Create notification for the other user
-    const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
+    // otherUserId already determined above (P1.6 block check)
     await createNotification({
       userId: otherUserId,
       type: 'message',

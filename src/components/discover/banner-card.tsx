@@ -15,6 +15,7 @@ interface BannerCardProps {
     body_type: string
     availability: string
     is_online: boolean
+    is_in_app: boolean
     last_seen: string
     street?: string | null
     cucumber_size?: number | null
@@ -105,8 +106,12 @@ export const BannerCard = memo(function BannerCard({
               <GeometricAvatar nickname={user.nickname} size="100%" className="w-full h-full" />
             )}
           </div>
-          {/* Online dot */}
-          {user.is_online && (
+          {/* In App indicator — stronger than online */}
+          {user.is_in_app && (
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-emerald-500 border-2 border-card" />
+          )}
+          {/* Online dot — only show if NOT in app (in app takes priority) */}
+          {user.is_online && !user.is_in_app && (
             <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-primary border-2 border-card" />
           )}
           {/* Available Now pulse */}
@@ -120,11 +125,22 @@ export const BannerCard = memo(function BannerCard({
 
         {/* Info area */}
         <div className="flex-1 min-w-0">
-          {/* Line 1: Nickname */}
+          {/* Line 1: Nickname + In App badge */}
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px]">
               {truncatedNickname}
             </span>
+            {user.is_in_app && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 leading-none shrink-0 flex items-center gap-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                In App
+              </span>
+            )}
+            {!user.is_in_app && user.is_online && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary leading-none shrink-0">
+                Online
+              </span>
+            )}
             {isNew && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary leading-none shrink-0">
                 New Here

@@ -201,6 +201,9 @@ export const SAFE_PAGES = [
 // Media Limits
 export const MEDIA_LIMITS = {
   MAX_PHOTO_SIZE_BYTES: 2 * 1024 * 1024, // 2MB
+  MAX_VOICE_NOTE_SIZE_BYTES: 5 * 1024 * 1024, // 5MB (audio can be larger)
+  MAX_VOICE_NOTE_DURATION_SECONDS: 120, // 2 minutes max
+  VOICE_NOTE_FORMAT: 'audio/ogg;codecs=opus', // Telegram preferred format
   MAX_FREE_PROFILE_PHOTOS: 2,
   MAX_PREMIUM_PROFILE_PHOTOS: 5,
   MAX_INTO_TAGS: 5,
@@ -208,6 +211,7 @@ export const MEDIA_LIMITS = {
   UNOPENED_MEDIA_DELETE_MINUTES: 30,
   OPENED_MEDIA_DELETE_HOURS: 24,
   CHAT_TEXT_DELETE_DAYS: 7,
+  VOICE_NOTE_DELETE_DAYS: 7, // P1.12: voice notes auto-delete after 7 days
   HARD_DELETE_DAYS: 7,
 } as const
 

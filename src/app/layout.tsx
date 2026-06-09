@@ -17,21 +17,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "GNECT",
-  description: "Connect. Meet. Explore. — Poland & Gulf Region",
-  manifest: "/manifest.webmanifest",
+  description: "Private. Anonymous. Yours. — Gulf & Poland",
   icons: {
     icon: [
       { url: "/logo.svg", type: "image/svg+xml" },
       { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: [
-      { url: "/icon-512.png", sizes: "512x512" },
-    ],
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "GNECT",
   },
 }
 

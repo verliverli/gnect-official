@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 // ============================================
@@ -40,6 +40,7 @@ model User {
   is_banned_posting Boolean  @default(false)
   is_online       Boolean   @default(false)
   last_seen       DateTime  @default(now())
+  in_app_at       DateTime?  // Last heartbeat timestamp — "In App" indicator when within 2 min
   chats_this_week Int       @default(0)
   chats_week_reset DateTime @default(now())
   not_today_count Int       @default(0)
@@ -84,6 +85,8 @@ model User {
   support_messages      SupportMessage[]
   ratings_given        UserRating[]   @relation("Rater")
   ratings_received     UserRating[]   @relation("Rated")
+  group_memberships    GroupMember[]
+  group_messages       GroupMessage[]
 
   @@index([nickname])
   @@index([country])
@@ -531,4 +534,65 @@ model UserRating {
   @@index([rater_id])
   @@index([rated_user_id])
   @@index([stars])
+}
+
+// ============================================
+// GROUP CHAT (MIXER) — Phase 4
+// Region-based anonymous group chat rooms
+// Text + voice notes only, auto-delete 7 days
+// ============================================
+
+model GroupRoom {
+  id              String   @id @default(cuid())
+  country         String   // Country name (e.g., "Qatar")
+  region          String   // Region name (e.g., "Ad Dawhah (Doha)")
+  name            String   // Display name (e.g., "Doha Room")
+  last_message_at DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  members         GroupMember[]
+  messages        GroupMessage[]
+
+  @@unique([country, region]) // One room per region per country
+  @@index([country])
+  @@index([last_message_at])
+}
+
+model GroupMember {
+  id              String   @id @default(cuid())
+  room_id         String
+  user_id         String
+  anonymous_name  String   // Random name like A7X, K3Z, M9F — unique per room per user
+  joined_at       DateTime @default(now())
+  last_read_at    DateTime @default(now())
+
+  room            GroupRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([room_id, user_id]) // One membership per room per user
+  @@unique([room_id, anonymous_name]) // Anonymous names unique per room
+  @@index([room_id])
+  @@index([user_id])
+}
+
+model GroupMessage {
+  id              String    @id @default(cuid())
+  room_id         String
+  sender_id       String
+  anonymous_name  String    // Snapshot of sender's anonymous name at send time
+  content         String?   // Text content (null for voice notes)
+  media_url       String?   // Voice note URL
+  media_type      String?   // "voice_note" only
+  reply_to_id     String?   // Reply to another group message
+  is_unsent       Boolean   @default(false)
+  sent_at         DateTime  @default(now())
+  hard_delete_at  DateTime  // 7-day auto-delete
+
+  room            GroupRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  sender          User      @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([room_id])
+  @@index([room_id, sent_at])
+  @@index([sender_id])
+  @@index([hard_delete_at])
 }

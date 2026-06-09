@@ -39,8 +39,19 @@ export async function GET(
       return NextResponse.json({ ok: false, error: "Not a participant of this chat" }, { status: 403 })
     }
 
-    // Determine the other user in this chat
+    // P1.6: Check block status (both directions) — blocked users cannot open chats
     const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
+    const blockRecord = await db.block.findFirst({
+      where: {
+        OR: [
+          { blocker_id: user.id, blocked_id: otherUserId },
+          { blocker_id: otherUserId, blocked_id: user.id },
+        ],
+      },
+    })
+    if (blockRecord) {
+      return NextResponse.json({ ok: false, error: "Cannot open chat with blocked user" }, { status: 403 })
+    }
 
     // Fire all independent queries in parallel for maximum speed
     const now = new Date()

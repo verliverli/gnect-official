@@ -63,7 +63,7 @@ const SECTIONS: {
     id: 'access',
     icon: <Smartphone className="w-5 h-5" />,
     title: 'Access Guide',
-    subtitle: 'Incognito setup, PWA install, bookmarks',
+    subtitle: 'Telegram Mini App, incognito, bookmarks',
     color: 'text-yellow-500 bg-yellow-500/10',
   },
 ]
@@ -286,7 +286,7 @@ function PrivacySafetyGuide() {
 
       <h4 className="font-semibold text-foreground flex items-center gap-1.5"><EyeOff className="w-4 h-4" /> Disguise & Stealth</h4>
       <ul className="space-y-2 text-muted-foreground">
-        <li><strong className="text-foreground">Stealth App Icon:</strong> PWA shows as &quot;Calculator&quot; on your home screen.</li>
+        <li><strong className="text-foreground">Telegram Mini App:</strong> Access via @GNECT_app_bot — no app icon on your home screen at all.</li>
         <li><strong className="text-foreground">Discreet Notifications:</strong> Choose disguised styles — Weather, News, Delivery updates.</li>
         <li><strong className="text-foreground">Disappear Mode:</strong> Hides chat content in the chat list (shows &quot;Tap to view&quot;).</li>
         <li><strong className="text-foreground">Not Today:</strong> Hide your profile from Discover for 24 hours.</li>
@@ -364,84 +364,58 @@ function ProfileGuide() {
 function AccessGuide() {
   return (
     <div className="space-y-3 text-sm text-foreground/90 leading-relaxed">
-      <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-        <p className="text-xs font-semibold text-yellow-500 mb-1 flex items-center gap-1"><Lock className="w-3 h-3" /> Why This Matters</p>
+      <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+        <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1"><Lock className="w-3 h-3" /> Privacy First</p>
         <p className="text-xs text-muted-foreground">
-          GNECT is designed for maximum privacy. Using incognito mode and the PWA ensures no browsing history is left behind and the app looks like a calculator on your home screen.
+          GNECT is designed for maximum privacy. Access via Telegram Mini App for the safest experience — no browsing history, no downloads, fully private.
         </p>
+      </div>
+
+      <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Smartphone className="w-4 h-4" /> Telegram Mini App (Recommended)</h4>
+      <div className="space-y-2 text-muted-foreground">
+        <p>The safest way to use GNECT. No browser history, no downloads, instant access.</p>
+        <ol className="list-decimal list-inside space-y-1 pl-2">
+          <li>Open <strong className="text-foreground">Telegram</strong></li>
+          <li>Search for <strong className="text-foreground">@GNECT_app_bot</strong></li>
+          <li>Tap <strong className="text-foreground">Start</strong> or the menu button</li>
+          <li>GNECT opens inside Telegram — fully private, no history saved</li>
+          <li>Your session stays active as long as you&apos;re in the Mini App</li>
+        </ol>
+        <p className="text-xs text-muted-foreground/60 mt-1 flex items-center gap-1"><Lock className="w-3 h-3" /> No downloads. No app store. No traces on your phone.</p>
       </div>
 
       <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Globe className="w-4 h-4" /> Using Incognito Mode</h4>
       <div className="space-y-2 text-muted-foreground">
+        <p>If you prefer the browser, always use incognito/private mode:</p>
         <p><strong className="text-foreground">Android (Chrome):</strong></p>
         <ol className="list-decimal list-inside space-y-1 pl-2">
-          <li>Open Chrome</li>
-          <li>Tap the 3-dot menu (⋮)</li>
-          <li>Select &quot;New Incognito tab&quot;</li>
-          <li>Navigate to the GNECT URL</li>
-          <li>Log in — your session is private</li>
+          <li>Tap the 3-dot menu (⋮) → &quot;New Incognito tab&quot;</li>
+          <li>Navigate to the GNECT URL — your session is private</li>
         </ol>
 
         <p className="mt-2"><strong className="text-foreground">iPhone (Safari):</strong></p>
         <ol className="list-decimal list-inside space-y-1 pl-2">
-          <li>Open Safari</li>
-          <li>Tap the tabs icon (square overlapping squares)</li>
-          <li>Tap the shield icon or &quot;Private&quot; at bottom</li>
+          <li>Tap tabs icon → shield icon → &quot;Private&quot;</li>
           <li>Navigate to the GNECT URL</li>
-          <li>Log in — your session is private</li>
         </ol>
 
-        <p className="mt-2"><strong className="text-foreground">Desktop (Chrome/Firefox/Edge):</strong></p>
+        <p className="mt-2"><strong className="text-foreground">Desktop:</strong></p>
         <ol className="list-decimal list-inside space-y-1 pl-2">
-          <li>Press <kbd className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">Ctrl+Shift+N</kbd> (Chrome/Edge) or <kbd className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">Ctrl+Shift+P</kbd> (Firefox)</li>
-          <li>Navigate to the GNECT URL</li>
-          <li>Log in — no history saved</li>
-        </ol>
-      </div>
-
-      <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Smartphone className="w-4 h-4" /> Installing as PWA</h4>
-      <p className="text-muted-foreground">
-        Installing GNECT as a PWA gives you a home screen icon (disguised as Calculator), full-screen experience, and push notifications.
-      </p>
-
-      <div className="space-y-2 text-muted-foreground">
-        <p><strong className="text-foreground">Android (Chrome):</strong></p>
-        <ol className="list-decimal list-inside space-y-1 pl-2">
-          <li>Open GNECT in Chrome</li>
-          <li>Tap the 3-dot menu (⋮)</li>
-          <li>Tap &quot;Add to Home screen&quot; or &quot;Install app&quot;</li>
-          <li>Confirm — the app icon appears on your home screen as &quot;Calculator&quot;</li>
-          <li>Open it from your home screen for the full app experience</li>
-        </ol>
-
-        <p className="mt-2"><strong className="text-foreground">iPhone (Safari):</strong></p>
-        <ol className="list-decimal list-inside space-y-1 pl-2">
-          <li>Open GNECT in Safari</li>
-          <li>Tap the Share button (square with arrow)</li>
-          <li>Scroll down and tap &quot;Add to Home Screen&quot;</li>
-          <li>Confirm — the app icon appears on your home screen as &quot;Calculator&quot;</li>
-          <li>Open it from your home screen for the full app experience</li>
-        </ol>
-
-        <p className="mt-2"><strong className="text-foreground">Desktop (Chrome/Edge):</strong></p>
-        <ol className="list-decimal list-inside space-y-1 pl-2">
-          <li>Open GNECT in Chrome or Edge</li>
-          <li>Click the install icon in the address bar (or menu → Install GNECT)</li>
-          <li>Confirm — the app opens in its own window</li>
+          <li><kbd className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">Ctrl+Shift+N</kbd> (Chrome/Edge) or <kbd className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">Ctrl+Shift+P</kbd> (Firefox)</li>
+          <li>Navigate to the GNECT URL — no history saved</li>
         </ol>
       </div>
 
       <h4 className="font-semibold text-foreground flex items-center gap-1.5"><BookOpen className="w-4 h-4" /> Bookmarking Safely</h4>
       <ul className="space-y-2 text-muted-foreground">
-        <li><strong className="text-foreground">Incognito tip:</strong> Bookmarks created in incognito mode are NOT saved when you close the window. Create bookmarks in normal mode.</li>
-        <li><strong className="text-foreground">Rename bookmark:</strong> Change the bookmark name to something neutral (e.g., &quot;Calculator&quot; or &quot;News&quot;).</li>
+        <li><strong className="text-foreground">Rename bookmark:</strong> Change the name to something neutral (e.g., &quot;News&quot; or &quot;Weather&quot;).</li>
         <li><strong className="text-foreground">Bookmark folder:</strong> Save in a folder mixed with other sites for camouflage.</li>
       </ul>
 
       <h4 className="font-semibold text-foreground flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Safety Tips</h4>
       <ul className="space-y-2 text-muted-foreground">
-        <li><strong className="text-foreground">Always use PWA or Incognito</strong> — don&apos;t leave GNECT in your normal browser tabs.</li>
-        <li><strong className="text-foreground">Enable Stealth App Icon</strong> — makes the home screen icon look like a Calculator.</li>
+        <li><strong className="text-foreground">Use Telegram Mini App</strong> — safest, no traces left on your phone.</li>
+        <li><strong className="text-foreground">Or use Incognito</strong> — don&apos;t leave GNECT in your normal browser tabs.</li>
         <li><strong className="text-foreground">Set a Safe Page</strong> — configure your panic redirect in Profile → Privacy.</li>
         <li><strong className="text-foreground">Use Discreet Notifications</strong> — so push alerts don&apos;t reveal the app.</li>
         <li><strong className="text-foreground">Enable Not Today</strong> when you can&apos;t use the app safely — hides your profile for 24h.</li>

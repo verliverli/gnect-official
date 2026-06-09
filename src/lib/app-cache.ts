@@ -16,6 +16,7 @@ import { useDataStore } from '@/lib/data-store'
 
 export const CACHE_TTL = {
   discover: 30_000,    // 30 seconds — nearby/all users
+  community: 30_000,   // 30 seconds — community posts
   chatList: 15_000,    // 15 seconds — chat list
   tags: Infinity,      // Never stale — rarely changes, only invalidates on manual action
   profile: Infinity,   // Never stale — only invalidates on profile update
@@ -82,11 +83,13 @@ interface AppCacheState {
 
   // Bulk invalidation
   invalidateDiscover: () => void
+  invalidateCommunity: () => void
   invalidateChatList: () => void
   invalidateAll: () => void
 
   // Check if data exists in the underlying data store
   hasCachedDiscover: () => boolean
+  hasCachedCommunity: () => boolean
   hasCachedChatList: () => boolean
   hasCachedTags: () => boolean
 }
@@ -126,6 +129,10 @@ export const useAppCache = create<AppCacheState>((set, get) => ({
     timestamps: { ...state.timestamps, discover: 0 },
   })),
 
+  invalidateCommunity: () => set((state) => ({
+    timestamps: { ...state.timestamps, community: 0 },
+  })),
+
   invalidateChatList: () => set((state) => ({
     timestamps: { ...state.timestamps, chatList: 0 },
   })),
@@ -138,6 +145,7 @@ export const useAppCache = create<AppCacheState>((set, get) => ({
 
   // Check if data exists in the underlying data store
   hasCachedDiscover: () => useDataStore.getState().nearbyUsers.length > 0 || useDataStore.getState().allUsers.length > 0,
+  hasCachedCommunity: () => useDataStore.getState().communityPosts.length > 0,
   hasCachedChatList: () => useDataStore.getState().chatList.length > 0,
   hasCachedTags: () => useDataStore.getState().currentTags.length > 0,
 }))
@@ -169,6 +177,7 @@ export async function cacheFirstFetch(
   // Check if we have any cached data (even if stale)
   const hasAnyCache =
     (key === 'discover' && cache.hasCachedDiscover()) ||
+    (key === 'community' && cache.hasCachedCommunity()) ||
     (key === 'chatList' && cache.hasCachedChatList()) ||
     (key === 'tags' && cache.hasCachedTags()) ||
     (key === 'profile' && cache.profileCached)

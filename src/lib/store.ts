@@ -108,25 +108,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 type BadgeState = {
   unreadChats: number
   unreadCommunity: number
+  unreadMixer: number
   setUnreadChats: (count: number) => void
   setUnreadCommunity: (count: number) => void
+  setUnreadMixer: (count: number) => void
   incrementChats: () => void
   decrementChats: () => void
   incrementCommunity: () => void
   decrementCommunity: () => void
+  incrementMixer: () => void
+  decrementMixer: () => void
   resetChats: () => void
   resetCommunity: () => void
+  resetMixer: () => void
 }
 
 export const useBadgeStore = create<BadgeState>((set) => ({
   unreadChats: 0,
   unreadCommunity: 0,
+  unreadMixer: 0,
   setUnreadChats: (count) => set({ unreadChats: count }),
   setUnreadCommunity: (count) => set({ unreadCommunity: count }),
+  setUnreadMixer: (count) => set({ unreadMixer: count }),
   incrementChats: () => set((s) => ({ unreadChats: s.unreadChats + 1 })),
   decrementChats: () => set((s) => ({ unreadChats: Math.max(0, s.unreadChats - 1) })),
   incrementCommunity: () => set((s) => ({ unreadCommunity: s.unreadCommunity + 1 })),
   decrementCommunity: () => set((s) => ({ unreadCommunity: Math.max(0, s.unreadCommunity - 1) })),
+  incrementMixer: () => set((s) => ({ unreadMixer: s.unreadMixer + 1 })),
+  decrementMixer: () => set((s) => ({ unreadMixer: Math.max(0, s.unreadMixer - 1) })),
   resetChats: () => set({ unreadChats: 0 }),
   resetCommunity: () => set({ unreadCommunity: 0 }),
+  resetMixer: () => set({ unreadMixer: 0 }),
 }))

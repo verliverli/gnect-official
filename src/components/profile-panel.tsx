@@ -8,7 +8,7 @@ import { useDataStore } from '@/lib/data-store'
 import { useAppCache } from '@/lib/app-cache'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { ROLES, BODY_TYPES, INTO_TAGS, AVAILABILITY_STATUSES, MEDIA_LIMITS, getMediaUrl, STATUS_PRESETS, STATUS_DURATIONS, SAFE_PAGES } from '@/lib/constants'
+import { ROLES, BODY_TYPES, INTO_TAGS, AVAILABILITY_STATUSES, MEDIA_LIMITS, getMediaUrl, STATUS_PRESETS, STATUS_DURATIONS, SAFE_PAGES, getRegionsForCountry, getCountryFlag, RATE_LIMITS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { AdminBroadcastPanel } from '@/components/admin-broadcast-panel'
@@ -27,7 +27,7 @@ interface ProfilePanelProps {
   onClose: () => void
 }
 
-type Section = 'bio' | 'physical' | 'tags' | 'availability' | 'privacy' | 'status' | 'admin_broadcast' | 'account' | null
+type Section = 'bio' | 'physical' | 'tags' | 'availability' | 'region' | 'privacy' | 'status' | 'admin_broadcast' | 'account' | null
 
 interface OwnPhoto {
   id: string
@@ -657,6 +657,70 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
                     {s}
                   </button>
                 ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Region — only for regular users */}
+          {!isAdmin && user?.country && (
+            <SectionCard
+              icon={<MapPin className="w-4 h-4" />}
+              label="Region"
+              value={`${getCountryFlag(user.country)} ${user.region}`}
+              isOpen={openSection === 'region'}
+              onToggle={() => toggleSection('region')}
+            >
+              <div className="space-y-3">
+                <div>
+                  <span className="text-xs text-muted-foreground mb-1 block">
+                    Country: {getCountryFlag(user.country)} {user.country}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/60">
+                    Country cannot be changed. Region changes are limited to once per {RATE_LIMITS.REGION_CHANGE_FREE_DAYS} days.
+                  </span>
+                </div>
+                {user.region_last_changed && (
+                  <div className="text-[10px] text-muted-foreground/60">
+                    Last changed: {new Date(user.region_last_changed).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
+                )}
+                <div>
+                  <span className="text-xs text-muted-foreground mb-2 block">Select your region</span>
+                  <div className="flex flex-wrap gap-2">
+                    {getRegionsForCountry(user.country).map((r) => (
+                      <button
+                        key={r}
+                        onClick={async () => {
+                          if (r === user.region) return
+                          try {
+                            const res = await fetch('/api/profile/update-region', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ region: r }),
+                              credentials: 'same-origin',
+                            })
+                            const data = await res.json()
+                            if (data.ok) {
+                              toast.success(`Region changed to ${r}`)
+                              await refreshUser()
+                            } else {
+                              toast.error(data.error || 'Failed to change region')
+                            }
+                          } catch {
+                            toast.error('Network error')
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          r === user.region
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </SectionCard>
           )}

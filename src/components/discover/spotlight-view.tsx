@@ -44,6 +44,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/lib/store'
+import { useDataStore } from '@/lib/data-store'
 import { getMediaUrl } from '@/lib/constants'
 import { GeometricAvatar } from '@/components/geometric-avatar'
 import { StarRating } from '@/components/star-rating'
@@ -78,6 +79,7 @@ interface SpotlightProfile {
   status_text: string | null
   status_gradient: string | null
   is_online: boolean
+  is_in_app: boolean
   last_seen: string
   created_at: string
   photos: SpotlightPhoto[]
@@ -86,6 +88,33 @@ interface SpotlightProfile {
   is_blocked: boolean
   rating_avg: number
   rating_count: number
+}
+
+interface SpotlightInitialData {
+  id: string
+  nickname: string
+  age: number
+  region: string
+  role: string
+  body_type: string
+  availability: string
+  is_online: boolean
+  is_in_app: boolean
+  last_seen: string
+  photos: { id: string; catbox_url: string; is_face_pic: boolean; is_locked: boolean }[]
+  into_tags: string[]
+  is_saved: boolean
+  rating_avg: number
+  rating_count: number
+  discretion_mode?: boolean
+  status_text?: string | null
+  status_gradient?: string | null
+  created_at?: string
+  street?: string | null
+  height?: number | null
+  weight?: number | null
+  cucumber_size?: number | null
+  show_cucumber?: boolean
 }
 
 interface SpotlightViewProps {
@@ -98,6 +127,8 @@ interface SpotlightViewProps {
   hasPrev?: boolean
   hasNext?: boolean
   onOpenChat?: (userId: string) => void
+  initialData?: SpotlightInitialData | null
+  onPreloadProfile?: (userId: string) => void
 }
 
 // ============================================
@@ -131,6 +162,10 @@ function relativeTime(dateStr: string): string {
 // Spotlight View Component
 // ============================================
 
+// Profile cache — stores previously fetched full profiles to avoid re-fetching
+const profileCache = new Map<string, { data: SpotlightProfile; timestamp: number }>()
+const PROFILE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 export function SpotlightView({
   userId,
   currentUserId,
@@ -141,8 +176,11 @@ export function SpotlightView({
   hasPrev = false,
   hasNext = false,
   onOpenChat,
+  initialData,
+  onPreloadProfile,
 }: SpotlightViewProps) {
   const { user: currentUser } = useAuthStore()
+  const dataStore = useDataStore
   const [profile, setProfile] = useState<SpotlightProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -159,40 +197,232 @@ export function SpotlightView({
   const [profileRatingAvg, setProfileRatingAvg] = useState(0)
   const [profileRatingCount, setProfileRatingCount] = useState(0)
 
-  // Fetch profile data
-  const fetchProfile = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  // Initialize from initialData if available — render INSTANTLY, no skeleton
+  useEffect(() => {
+    if (!userId) return
     setPhotoIndex(0)
     setUnlockedPhotos(new Set())
     setOpenSection(null)
-    try {
-      const res = await fetch(`/api/profile/${userId}`, { credentials: 'same-origin' })
-      const data = await res.json()
-      if (data.ok) {
-        setProfile(data.data)
-        setIsSaved(data.data.is_saved)
-        setProfileRatingAvg(data.data.rating_avg ?? 0)
-        setProfileRatingCount(data.data.rating_count ?? 0)
-        // Fetch my rating for this user
-        try {
-          const ratingRes = await fetch(`/api/ratings?userId=${userId}`, { credentials: 'same-origin' })
-          const ratingData = await ratingRes.json()
-          if (ratingData.ok) setMyRating(ratingData.myRating)
-        } catch { /* silent */ }
-      } else {
-        setError(data.error || 'Failed to load profile')
-      }
-    } catch {
-      setError('Network error')
-    } finally {
-      setLoading(false)
-    }
-  }, [userId])
+    setError(null)
 
+    // Check profile cache first
+    const cached = profileCache.get(userId)
+    if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_TTL) {
+      setProfile(cached.data)
+      setIsSaved(cached.data.is_saved)
+      setProfileRatingAvg(cached.data.rating_avg ?? 0)
+      setProfileRatingCount(cached.data.rating_count ?? 0)
+      setLoading(false)
+      // Still fetch my rating in background
+      fetch(`/api/ratings?userId=${userId}`, { credentials: 'same-origin' })
+        .then((r) => r.json())
+        .then((d) => { if (d.ok) setMyRating(d.myRating) })
+        .catch(() => {})
+      return
+    }
+
+    // Map initialData to SpotlightProfile format for instant render
+    if (initialData && initialData.id === userId) {
+      const instantProfile: SpotlightProfile = {
+        id: initialData.id,
+        nickname: initialData.nickname,
+        age: initialData.age,
+        region: initialData.region,
+        bio: '', // Will be filled by background fetch
+        height: initialData.height ?? null,
+        weight: initialData.weight ?? null,
+        body_type: initialData.body_type,
+        role: initialData.role,
+        availability: initialData.availability,
+        discretion_mode: initialData.discretion_mode ?? false,
+        has_secret_phrase: false, // Will be updated
+        street: initialData.street ?? null,
+        cucumber_size: initialData.cucumber_size ?? null,
+        show_cucumber: initialData.show_cucumber ?? false,
+        status_text: initialData.status_text ?? null,
+        status_gradient: initialData.status_gradient ?? null,
+        is_online: initialData.is_online,
+        is_in_app: initialData.is_in_app,
+        last_seen: initialData.last_seen,
+        created_at: initialData.created_at ?? new Date().toISOString(),
+        photos: initialData.photos,
+        into_tags: initialData.into_tags,
+        is_saved: initialData.is_saved,
+        is_blocked: false, // Will be updated
+        rating_avg: initialData.rating_avg,
+        rating_count: initialData.rating_count,
+      }
+      setProfile(instantProfile)
+      setIsSaved(initialData.is_saved)
+      setProfileRatingAvg(initialData.rating_avg ?? 0)
+      setProfileRatingCount(initialData.rating_count ?? 0)
+      setLoading(false) // INSTANT — no skeleton!
+    }
+
+    // Always fetch full profile in background for complete data
+    const fetchFullProfile = async () => {
+      try {
+        const res = await fetch(`/api/profile/${userId}`, { credentials: 'same-origin' })
+        const data = await res.json()
+        if (data.ok) {
+          setProfile(data.data)
+          setIsSaved(data.data.is_saved)
+          setProfileRatingAvg(data.data.rating_avg ?? 0)
+          setProfileRatingCount(data.data.rating_count ?? 0)
+          // Cache the full profile
+          profileCache.set(userId, { data: data.data, timestamp: Date.now() })
+          // Fetch my rating
+          try {
+            const ratingRes = await fetch(`/api/ratings?userId=${userId}`, { credentials: 'same-origin' })
+            const ratingData = await ratingRes.json()
+            if (ratingData.ok) setMyRating(ratingData.myRating)
+          } catch { /* silent */ }
+        } else if (!initialData) {
+          // Only show error if we have no initial data to fall back on
+          setError(data.error || 'Failed to load profile')
+        }
+      } catch {
+        if (!initialData) {
+          setError('Network error')
+        }
+      } finally {
+        if (!initialData) setLoading(false)
+      }
+    }
+
+    if (initialData && initialData.id === userId) {
+      // We already showed initial data — just fetch in background
+      fetchFullProfile()
+    } else {
+      // No initial data — show loading skeleton then fetch
+      setLoading(true)
+      fetchFullProfile()
+    }
+  }, [userId, initialData])
+
+  // Preload adjacent profiles when spotlight opens
   useEffect(() => {
-    fetchProfile()
-  }, [fetchProfile])
+    if (onPreloadProfile && hasNext) {
+      // Preload next profiles after a short delay to avoid competing with current profile fetch
+      const timer = setTimeout(() => {
+        onPreloadProfile(userId) // Signal to parent to preload adjacent
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [userId, hasNext, onPreloadProfile])
+
+  // CHAT PRELOAD — Fire chat create + messages in background while user reads profile
+  // This makes clicking MESSAGE instant (0ms perceived) instead of 3-5 seconds
+  useEffect(() => {
+    if (!userId || !currentUser || userId === currentUser.id) return
+
+    // Check if we already have a fresh preload for this user
+    const existing = dataStore.getState().getChatPreload(userId)
+    if (existing && !existing.error) return // Already preloaded and fresh
+
+    // Abort controller for cleanup — cancels requests if user swipes away
+    const abortController = new AbortController()
+    const { signal } = abortController
+
+    const preloadChat = async () => {
+      try {
+        // Step 1: Create/get chat + fetch profile IN PARALLEL
+        const [chatRes, profileRes] = await Promise.all([
+          fetch('/api/chat/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+            credentials: 'same-origin',
+            signal,
+          }),
+          fetch(`/api/profile/${userId}`, {
+            credentials: 'same-origin',
+            signal,
+          }),
+        ])
+
+        if (signal.aborted) return
+
+        const chatData = await chatRes.json()
+        const profileData = await profileRes.json()
+
+        if (!chatData.ok) {
+          // Store error so chat screen can show it
+          dataStore.getState().setChatPreload(userId, {
+            chatId: '',
+            otherUser: { id: userId, nickname: 'User', photo: null, is_online: false },
+            messages: [],
+            nextCursor: null,
+            selfDestructHours: null,
+            myRating: null,
+            timestamp: Date.now(),
+            error: chatData.error || 'Failed to create chat',
+          })
+          return
+        }
+
+        const chatId = chatData.data.id
+        const otherUser = profileData.ok
+          ? {
+              id: userId,
+              nickname: profileData.data.nickname,
+              photo: getMediaUrl(profileData.data.photos?.[0]?.catbox_url) ?? null,
+              is_online: profileData.data.is_online,
+              is_in_app: profileData.data.is_in_app || false,
+            }
+          : { id: userId, nickname: 'User', photo: null, is_online: false, is_in_app: false }
+
+        // Step 2: Open the chat to get messages — this is the slow part we're preloading
+        const openRes = await fetch(`/api/chat/${chatId}/open`, {
+          credentials: 'same-origin',
+          signal,
+        })
+
+        if (signal.aborted) return
+
+        const openData = await openRes.json()
+
+        if (openData.ok) {
+          // ✅ ALL data loaded — store in cache for instant access when MESSAGE is clicked
+          dataStore.getState().setChatPreload(userId, {
+            chatId,
+            otherUser,
+            messages: openData.data.messages || [],
+            nextCursor: openData.data.nextCursor || null,
+            selfDestructHours: openData.data.selfDestructHours,
+            myRating: openData.data.myRating,
+            timestamp: Date.now(),
+          })
+          // Also cache messages in the regular chat messages cache
+          dataStore.getState().setChatMessages(chatId, openData.data.messages || [])
+        } else {
+          // Chat created but open failed — still store chatId + otherUser for optimistic shell
+          dataStore.getState().setChatPreload(userId, {
+            chatId,
+            otherUser,
+            messages: [],
+            nextCursor: null,
+            selfDestructHours: null,
+            myRating: null,
+            timestamp: Date.now(),
+            error: openData.error || 'Failed to load messages',
+          })
+        }
+      } catch (err: any) {
+        // Don't store error for aborted requests
+        if (err?.name === 'AbortError' || signal.aborted) return
+        // Network error — silent fail, chat will load normally when clicked
+      }
+    }
+
+    // Delay preload slightly so it doesn't compete with the spotlight profile fetch
+    const timer = setTimeout(preloadChat, 800)
+
+    return () => {
+      clearTimeout(timer)
+      abortController.abort() // Cancel in-flight requests on cleanup
+    }
+  }, [userId, currentUser, dataStore])
 
   // Save/bookmark toggle
   const toggleSave = async () => {
@@ -528,10 +758,19 @@ export function SpotlightView({
         {/* ===== PROFILE INFO CARD (overlapping photo) ===== */}
         <div className="relative -mt-8 z-10 rounded-t-3xl bg-background border-t border-border/50">
           <div className="px-4 pt-5 pb-4 space-y-3">
-            {/* Nickname + Online indicator */}
+            {/* Nickname + In App / Online indicator */}
             <div className="flex items-center gap-2.5">
               <h1 className="text-2xl font-bold truncate">{profile.nickname}</h1>
-              {profile.is_online && (
+              {profile.is_in_app && (
+                <span className="flex items-center gap-1 text-xs font-medium text-emerald-500 shrink-0">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                  </span>
+                  In App
+                </span>
+              )}
+              {!profile.is_in_app && profile.is_online && (
                 <span className="flex items-center gap-1 text-xs font-medium text-primary shrink-0">
                   <span className="relative flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />

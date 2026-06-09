@@ -3,16 +3,17 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import { io } from 'socket.io-client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Compass, Search, RefreshCw, Users, MapPin, Loader2, RotateCcw, ChevronDown, Shield, SlidersHorizontal, Flame } from 'lucide-react'
+import { Compass, Search, RefreshCw, Users, MapPin, Loader2, RotateCcw, ChevronDown, Shield, SlidersHorizontal, Flame, Bookmark } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { useDataStore } from '@/lib/data-store'
 import { useAppCache, dedupFetch } from '@/lib/app-cache'
 import { BannerCard } from '@/components/discover/banner-card'
 import { SpotlightView } from '@/components/discover/spotlight-view'
+import { SavedProfilesPanel } from '@/components/discover/saved-profiles-panel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { ROLES, BODY_TYPES, AVAILABILITY_STATUSES, INTO_TAGS } from '@/lib/constants'
+import { ROLES, BODY_TYPES, AVAILABILITY_STATUSES, INTO_TAGS, getRegionsForCountry } from '@/lib/constants'
 
 // ============================================
 // Types
@@ -29,6 +30,7 @@ interface DiscoverUser {
   body_type: string
   availability: string
   is_online: boolean
+  is_in_app: boolean
   last_seen: string
   street?: string | null
   cucumber_size?: number | null
@@ -52,6 +54,7 @@ interface NearbyFilters {
   tag: string
   ageMin: string
   ageMax: string
+  region: string
 }
 
 const DEFAULT_NEARBY_FILTERS: NearbyFilters = {
@@ -62,6 +65,7 @@ const DEFAULT_NEARBY_FILTERS: NearbyFilters = {
   tag: '',
   ageMin: '',
   ageMax: '',
+  region: '',
 }
 
 // ============================================
@@ -105,6 +109,8 @@ const DropdownFilter = memo(function DropdownFilter({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
         className={`w-full h-10 px-3 rounded-xl border text-sm text-left flex items-center justify-between gap-2 transition-colors ${
           value
             ? 'border-primary/30 bg-primary/5 text-primary font-medium'
@@ -192,9 +198,42 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
   // Filter state for Nearby
   const [filters, setFilters] = useState<NearbyFilters>(DEFAULT_NEARBY_FILTERS)
 
+  // Search state for Nearby — debounced for real-time feel
+  const [nearbySearch, setNearbySearch] = useState('')
+  const [debouncedNearbySearch, setDebouncedNearbySearch] = useState('')
+
+  // Debounce nearby search — 300ms delay so we don't hammer the server on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNearbySearch(nearbySearch)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [nearbySearch])
+
   // Spotlight state
   const [spotlightUserId, setSpotlightUserId] = useState<string | null>(null)
   const [spotlightIndex, setSpotlightIndex] = useState(-1)
+
+  // Saved profiles panel
+  const [showSavedProfiles, setShowSavedProfiles] = useState(false)
+
+  // Preload profiles — fire background fetches for adjacent profiles when spotlight opens
+  const handlePreloadProfile = useCallback((currentUserId: string) => {
+    const currentList = activeTab === 'nearby' ? nearbyUsers : allUsers
+    const idx = currentList.findIndex((u) => u.id === currentUserId)
+    if (idx === -1) return
+    // Preload next 2 profiles in background
+    for (let i = 1; i <= 2; i++) {
+      const nextIdx = idx + i
+      if (nextIdx < currentList.length) {
+        const nextUser = currentList[nextIdx]
+        fetch(`/api/profile/${nextUser.id}`, { credentials: 'same-origin' })
+          .then((r) => r.json())
+          .then((d) => { if (d.ok) { /* Cached by SpotlightView's profileCache */ } })
+          .catch(() => {})
+      }
+    }
+  }, [activeTab, nearbyUsers, allUsers])
 
   // Pull-to-refresh state
   const [pullStartY, setPullStartY] = useState<number | null>(null)
@@ -293,7 +332,8 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
     (filters.street.trim() ? 1 : 0) +
     (filters.tag ? 1 : 0) +
     (filters.ageMin ? 1 : 0) +
-    (filters.ageMax ? 1 : 0)
+    (filters.ageMax ? 1 : 0) +
+    (filters.region ? 1 : 0)
   , [filters])
 
   // Fetch current user's tags on mount — cache-first with dedup
@@ -349,6 +389,12 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
     // Tag filter
     if (filters.tag) params.set('tag', filters.tag)
 
+    // Region filter — allows viewing other regions within same country
+    if (filters.region) params.set('region', filters.region)
+
+    // Nickname search — use debounced value so we don't send half-typed queries
+    if (debouncedNearbySearch.trim()) params.set('search', debouncedNearbySearch.trim().slice(0, 20))
+
     // Age range
     if (filters.ageMin) {
       const min = parseInt(filters.ageMin)
@@ -377,7 +423,7 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
     else if (!silent && !hasCachedData) setNearbyLoading(true)
 
     // Include filters in dedup key so changing filters always triggers a NEW fetch
-    const filterKey = JSON.stringify(filters)
+    const filterKey = JSON.stringify(filters) + debouncedNearbySearch
     const paramsKey = cursor ? `nearby-${cursor}-${filterKey}` : `nearby-${filterKey}`
 
     try {
@@ -505,7 +551,7 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
       setNearbyLoading(true)  // Show loading skeleton right away
       fetchNearby()
     }
-  }, [currentUser, filters])
+  }, [currentUser, filters, debouncedNearbySearch])
 
   useEffect(() => {
     if (activeTab === 'all' && currentUser) {
@@ -516,6 +562,20 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
       fetchAll()
     }
   }, [activeTab, currentUser, allSearch, allAvailableOnly])
+
+  // ========================================
+  // Periodic background refresh for nearby tab
+  // Silently refreshes every 30s so users see fresh profiles
+  // ========================================
+  useEffect(() => {
+    if (!currentUser || activeTab !== 'nearby') return
+
+    const interval = setInterval(() => {
+      fetchNearby(undefined, false, true) // silent refresh — no loading spinner
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [currentUser, activeTab, fetchNearby])
 
   // ========================================
   // Save/bookmark toggle
@@ -569,6 +629,36 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
     setSpotlightIndex(idx)
     setSpotlightUserId(userId)
   }, [activeTab, nearbyUsers, allUsers])
+
+  // Get initial data for the current spotlight user — maps DiscoverUser to SpotlightInitialData
+  const getSpotlightInitialData = useCallback(() => {
+    if (!spotlightUserId) return null
+    const currentList = activeTab === 'nearby' ? nearbyUsers : allUsers
+    const user = currentList.find((u) => u.id === spotlightUserId)
+    if (!user) return null
+    return {
+      id: user.id,
+      nickname: user.nickname,
+      age: user.age,
+      region: user.region,
+      role: user.role,
+      body_type: user.body_type,
+      availability: user.availability,
+      is_online: user.is_online,
+      is_in_app: user.is_in_app,
+      last_seen: user.last_seen,
+      photos: user.photos,
+      into_tags: user.into_tags,
+      is_saved: user.is_saved,
+      rating_avg: user.rating_avg,
+      rating_count: user.rating_count,
+      discretion_mode: user.discretion_mode,
+      status_text: user.status_text,
+      status_gradient: user.status_gradient,
+      created_at: user.created_at,
+      street: user.street,
+    }
+  }, [spotlightUserId, activeTab, nearbyUsers, allUsers])
 
   const closeSpotlight = useCallback(() => {
     setSpotlightUserId(null)
@@ -716,6 +806,8 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
       <div className="flex items-center border-b border-border/50 shrink-0">
         <div className="flex-1 flex items-center justify-center relative">
           <button
+            role="tab"
+            aria-selected={activeTab === 'nearby'}
             onClick={() => setActiveTab('nearby')}
             className={`flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors ${
               activeTab === 'nearby' ? 'text-primary' : 'text-muted-foreground'
@@ -745,6 +837,8 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
           )}
         </div>
         <button
+          role="tab"
+          aria-selected={activeTab === 'all'}
           onClick={() => setActiveTab('all')}
           className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors relative ${
             activeTab === 'all' ? 'text-primary' : 'text-muted-foreground'
@@ -756,7 +850,42 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
             <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-primary rounded-full gnect-tab-fade" />
           )}
         </button>
+        {/* Saved Profiles button */}
+        <button
+          onClick={() => setShowSavedProfiles(true)}
+          className="h-10 w-10 rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+          aria-label="View saved profiles"
+        >
+          <Bookmark className="w-4 h-4" />
+        </button>
       </div>
+
+      {/* ===== NEARBY SEARCH BAR ===== */}
+      {activeTab === 'nearby' && (
+        <div className="px-4 py-2 shrink-0 border-b border-border/30 bg-background/95">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by nickname..."
+              value={nearbySearch}
+              onChange={(e) => {
+                if (e.target.value.length <= 20) setNearbySearch(e.target.value)
+              }}
+              className="pl-9 h-10 rounded-xl text-sm pr-8"
+              maxLength={20}
+            />
+            {nearbySearch && (
+              <button
+                type="button"
+                onClick={() => setNearbySearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ===== NEARBY FILTER DROPDOWNS (collapsible) ===== */}
       {activeTab === 'nearby' && (
@@ -789,7 +918,7 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
             />
           </div>
 
-          {/* Row 2: Body Type + Street */}
+          {/* Row 2: Body Type + Region */}
           <div className="grid grid-cols-2 gap-2 mb-2">
             <DropdownFilter
               label="Body Type"
@@ -798,6 +927,19 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
               options={BODY_TYPES}
               placeholder="All Types"
             />
+            {currentUser?.country && (
+              <DropdownFilter
+                label="Region"
+                value={filters.region}
+                onChange={(v) => setFilters((prev) => ({ ...prev, region: v }))}
+                options={getRegionsForCountry(currentUser.country) as unknown as readonly string[]}
+                placeholder="My Region"
+              />
+            )}
+          </div>
+
+          {/* Row 3: Street + Age Range */}
+          <div className="grid grid-cols-2 gap-2 mb-2">
             <div className="space-y-1">
               <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-0.5">
                 Street / Area
@@ -825,17 +967,6 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Row 3: Tag + Age Range */}
-          <div className="grid grid-cols-2 gap-2">
-            <DropdownFilter
-              label="Into Tag"
-              value={filters.tag}
-              onChange={(v) => setFilters((prev) => ({ ...prev, tag: v }))}
-              options={INTO_TAGS}
-              placeholder="All Tags"
-            />
             <div className="space-y-1">
               <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-0.5">
                 Age Range
@@ -864,6 +995,17 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
                 />
               </div>
             </div>
+          </div>
+
+          {/* Row 4: Tag */}
+          <div className="grid grid-cols-2 gap-2">
+            <DropdownFilter
+              label="Into Tag"
+              value={filters.tag}
+              onChange={(v) => setFilters((prev) => ({ ...prev, tag: v }))}
+              options={INTO_TAGS}
+              placeholder="All Tags"
+            />
           </div>
 
           {/* Active filters + reset */}
@@ -1057,6 +1199,25 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
             hasPrev={spotlightIndex > 0}
             hasNext={spotlightIndex < (activeTab === 'nearby' ? nearbyUsers : allUsers).length - 1}
             onOpenChat={onOpenChat}
+            initialData={getSpotlightInitialData()}
+            onPreloadProfile={handlePreloadProfile}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Saved Profiles Panel */}
+      <AnimatePresence>
+        {showSavedProfiles && (
+          <SavedProfilesPanel
+            onClose={() => setShowSavedProfiles(false)}
+            onOpenProfile={(userId) => {
+              setShowSavedProfiles(false)
+              openSpotlight(userId)
+            }}
+            onOpenChat={(userId) => {
+              setShowSavedProfiles(false)
+              if (onOpenChat) onOpenChat(userId)
+            }}
           />
         )}
       </AnimatePresence>

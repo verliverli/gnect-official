@@ -26,6 +26,14 @@ export async function GET(request: NextRequest) {
     const onlineOnly = searchParams.get("onlineOnly") === "true"
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20"), 1), 50)
     const offset = parseInt(searchParams.get("offset") || "0")
+    const seedParam = searchParams.get("seed")
+    const regionParam = searchParams.get("region")
+    const search = searchParams.get("search")
+
+    // Validate search parameter
+    if (search && search.length > 20) {
+      return NextResponse.json({ ok: false, error: "Search query too long (max 20 chars)" }, { status: 400 })
+    }
 
     // Validate role filters
     const validRoles = roleParams.filter((r) => ROLES.includes(r as typeof ROLES[number]))
@@ -65,13 +73,26 @@ export async function GET(request: NextRequest) {
     // STRICT: Nearby ONLY shows users in the EXACT same country AND region
     // Admin users see ALL countries/regions (they manage the platform)
     // Non-admin WITHOUT a region CANNOT see anyone nearby (return empty)
+    // If regionParam is provided, show that specific region within the same country
     if (!user.is_admin) {
-      if (!user.country || !user.region) {
-        // No location set = cannot see anyone nearby — strict enforcement
+      if (!user.country) {
+        // No country set = cannot see anyone nearby — strict enforcement
         return NextResponse.json({ ok: true, data: [], nextCursor: null, total: 0 })
       }
       where.country = user.country
-      where.region = user.region
+      if (regionParam) {
+        // Filter by specific region within same country
+        where.region = regionParam
+      } else {
+        // Default: same region as user
+        if (!user.region) {
+          return NextResponse.json({ ok: true, data: [], nextCursor: null, total: 0 })
+        }
+        where.region = user.region
+      }
+    } else if (regionParam) {
+      // Admin with region filter
+      where.region = regionParam
     }
 
     // Apply optional filters — multiple roles
@@ -91,6 +112,11 @@ export async function GET(request: NextRequest) {
     if (availability) where.availability = availability
     if (street) where.street = street
     if (onlineOnly) where.is_online = true
+
+    // Apply nickname search (case-insensitive partial match)
+    if (search) {
+      where.nickname = { contains: search }
+    }
 
     // Build excluded IDs (self + blocked users)
     const excludeIds = [user.id, ...blockedUserIds]
@@ -143,6 +169,7 @@ export async function GET(request: NextRequest) {
         availability: true,
         is_online: true,
         last_seen: true,
+        in_app_at: true,
         street: true,
         cucumber_size: true,
         show_cucumber: true,
@@ -199,6 +226,33 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // After the sort, shuffle within tiers (online vs offline) using seed
+    const seed = seedParam ? parseInt(seedParam) : Math.floor(Date.now() / 86400000) // Changes daily
+
+    // Simple seeded random for consistent shuffling within a session
+    function seededRandom(s: number): number {
+      const x = Math.sin(s) * 10000
+      return x - Math.floor(x)
+    }
+
+    // Group by online status, shuffle within each group, then recombine
+    const onlineUsers = allUsers.filter(u => u.is_online)
+    const offlineUsers = allUsers.filter(u => !u.is_online)
+
+    // Seeded shuffle
+    for (let i = onlineUsers.length - 1; i > 0; i--) {
+      const j = Math.floor(seededRandom(seed + i) * (i + 1))
+      ;[onlineUsers[i], onlineUsers[j]] = [onlineUsers[j], onlineUsers[i]]
+    }
+    for (let i = offlineUsers.length - 1; i > 0; i--) {
+      const j = Math.floor(seededRandom(seed + i + 1000) * (i + 1))
+      ;[offlineUsers[i], offlineUsers[j]] = [offlineUsers[j], offlineUsers[i]]
+    }
+
+    // Recombine: online first, then offline (both shuffled within their group)
+    allUsers.length = 0
+    allUsers.push(...onlineUsers, ...offlineUsers)
+
     // Cursor-based pagination — find cursor position and skip past it
     let startIndex = 0
     if (cursor) {
@@ -235,6 +289,7 @@ export async function GET(request: NextRequest) {
       body_type: u.body_type,
       availability: u.availability,
       is_online: u.is_online,
+      is_in_app: u.in_app_at ? (Date.now() - new Date(u.in_app_at).getTime() < 2 * 60 * 1000) : false,
       last_seen: u.last_seen,
       street: u.street,
       cucumber_size: u.show_cucumber ? u.cucumber_size : null,
