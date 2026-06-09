@@ -1831,19 +1831,42 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   // RENDER: Chat List
   // ============================================
 
-  // Pull-to-refresh state (chat list)
+  // Pull-to-refresh state (chat list) — same pattern as discover screen
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [pullDist, setPullDist] = useState(0)
-  const pullStartY = useRef(0)
-  const isPulling = useRef(false)
+  const [pullStartY, setPullStartY] = useState<number | null>(null)
+  const [pullDistance, setPullDistance] = useState(0)
 
   const handlePullRefresh = useCallback(async () => {
     setIsRefreshing(true)
-    setPullDist(0)
+    setPullDistance(0)
+    setPullStartY(null)
     appCache.getState().setTimestamp('chatList', 0) // Force stale
     await fetchChats(true)
     setIsRefreshing(false)
   }, [fetchChats, appCache])
+
+  const onChatListTouchStart = (e: React.TouchEvent) => {
+    if (chatListRef.current && chatListRef.current.scrollTop === 0) {
+      setPullStartY(e.touches[0].clientY)
+    }
+  }
+
+  const onChatListTouchMove = (e: React.TouchEvent) => {
+    if (pullStartY === null) return
+    const diff = e.touches[0].clientY - pullStartY
+    if (diff > 0 && chatListRef.current && chatListRef.current.scrollTop === 0) {
+      setPullDistance(Math.min(diff * 0.5, 80))
+    }
+  }
+
+  const onChatListTouchEnd = () => {
+    if (pullDistance > 50 && !isRefreshing) {
+      handlePullRefresh()
+    } else {
+      setPullStartY(null)
+      setPullDistance(0)
+    }
+  }
 
   // Pull-to-refresh removed from messages view — only on chat list
 
@@ -1868,52 +1891,33 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
         </div>
       </div>
 
-      {/* Chat List with Pull-to-Refresh */}
+      {/* Pull-to-refresh indicator — outside scroll container like discover screen */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className="flex items-center justify-center transition-all shrink-0"
+          style={{ height: isRefreshing ? 44 : pullDistance }}
+        >
+          {isRefreshing ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="text-xs font-medium text-muted-foreground ml-2">Refreshing...</span>
+            </>
+          ) : (
+            <RefreshCw
+              className={`w-4 h-4 text-primary ${pullDistance > 50 ? 'animate-spin' : ''}`}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Chat List Scroll Area */}
       <div
         ref={chatListRef}
-        className="flex-1 overflow-y-auto gnect-scroll"
-        onTouchStart={(e) => {
-          const el = e.currentTarget
-          if (el.scrollTop <= 0) {
-            pullStartY.current = e.touches[0].clientY
-            isPulling.current = true
-          }
-        }}
-        onTouchMove={(e) => {
-          if (!isPulling.current) return
-          const el = e.currentTarget
-          if (el.scrollTop > 0) {
-            isPulling.current = false
-            setPullDist(0)
-            return
-          }
-          const dist = Math.max(0, e.touches[0].clientY - pullStartY.current)
-          setPullDist(Math.min(dist, 150))
-        }}
-        onTouchEnd={() => {
-          if (isPulling.current && pullDist > 80 && !isRefreshing) {
-            handlePullRefresh()
-          }
-          isPulling.current = false
-          setPullDist(0)
-        }}
+        className="flex-1 overflow-y-auto overscroll-contain gnect-scroll"
+        onTouchStart={onChatListTouchStart}
+        onTouchMove={onChatListTouchMove}
+        onTouchEnd={onChatListTouchEnd}
       >
-        {/* Pull-to-refresh indicator — visible while pulling AND while refreshing */}
-        {(pullDist > 20 || isRefreshing) && (
-          <div
-            className="flex items-center justify-center gap-2 text-muted-foreground transition-all"
-            style={{ height: isRefreshing ? 44 : Math.min(pullDist * 0.5, 60) }}
-          >
-            {isRefreshing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-xs font-medium">Refreshing...</span>
-              </>
-            ) : (
-              <RefreshCw className={`w-4 h-4 ${pullDist > 80 ? 'animate-spin text-primary' : ''}`} />
-            )}
-          </div>
-        )}
         {chatsLoading ? (
           <div className="px-4 space-y-3 py-2">
             {[1, 2, 3, 4, 5].map((i) => (
