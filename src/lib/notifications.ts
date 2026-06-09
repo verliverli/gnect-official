@@ -5,6 +5,7 @@
 
 import { db } from './db'
 import webpush from 'web-push'
+import { sendTelegramNotification } from './telegram-notifications'
 
 // Configure web-push with VAPID — only if keys are available
 // If keys are missing, push notifications are skipped gracefully
@@ -27,6 +28,9 @@ try {
 // Chat service URL for Socket.io emission (server-to-server)
 // Production: HuggingFace Space (cloud relay). Dev: local chat-service on port 3003
 const CHAT_SERVICE_URL = process.env.CHAT_SERVICE_URL || ''
+
+// Web App URL for Telegram notification deep links
+const WEB_APP_URL = process.env.NEXT_PUBLIC_WEB_APP_URL || 'https://gnect.vercel.app'
 
 interface CreateNotificationParams {
   userId: string
@@ -137,6 +141,22 @@ export async function createNotification({ userId, type, title, body, data, isBr
         body: discreetMsg.body,
         data: data || {},
       })
+
+      // Send Telegram bot notification (fire-and-forget) — the #1 engagement driver
+      // Users get a message in their Telegram chat even when the Mini App is closed
+      const telegramOpenUrl = data?.chatId
+        ? `${WEB_APP_URL}`
+        : data?.postId
+        ? `${WEB_APP_URL}`
+        : WEB_APP_URL
+
+      sendTelegramNotification({
+        userId,
+        title,
+        body,
+        type,
+        openUrl: telegramOpenUrl,
+      }).catch(() => {}) // Fire-and-forget — don't block the response
     }
   } catch (err) {
     console.error('Create notification error:', err)

@@ -58,6 +58,7 @@ model User {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
   token_invalidated_before DateTime?
+  telegram_chat_id  String?  // Telegram chat ID for bot notifications — set when user opens bot
 
   photos          ProfilePhoto[]
   into_tags       IntoTag[]
