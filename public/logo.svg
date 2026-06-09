@@ -1,29 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 30 30" style="enable-background:new 0 0 30 30;" xml:space="preserve">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px"
+	 viewBox="0 0 512 512" xml:space="preserve">
 <defs>
-  <style type="text/css">
-    .st194{fill:#2D2D2D;stroke:#FFFFFF;stroke-width:0.6317;stroke-miterlimit:10;}
-    .st23{fill:#FFFFFF;}
-
-    .z-breathe {
-      animation: breathe 2.5s ease-in-out infinite;
-    }
-
-    @keyframes breathe {
-      0%, 100% { opacity: 0.7; }
-      50% { opacity: 1; }
-    }
-  </style>
+  <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#0d0d1a"/>
+    <stop offset="100%" style="stop-color:#1a1a2e"/>
+  </linearGradient>
+  <linearGradient id="gGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#00ff88"/>
+    <stop offset="50%" style="stop-color:#00cc6a"/>
+    <stop offset="100%" style="stop-color:#009950"/>
+  </linearGradient>
+  <linearGradient id="gShine" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" style="stop-color:#66ffbb;stop-opacity:0.6"/>
+    <stop offset="40%" style="stop-color:#00ff88;stop-opacity:0"/>
+    <stop offset="100%" style="stop-color:#004422;stop-opacity:0.3"/>
+  </linearGradient>
+  <linearGradient id="g3dTop" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" style="stop-color:#88ffcc;stop-opacity:0.5"/>
+    <stop offset="100%" style="stop-color:#00ff88;stop-opacity:0"/>
+  </linearGradient>
+  <filter id="shadow3d" x="-10%" y="-10%" width="130%" height="130%">
+    <feDropShadow dx="4" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.6"/>
+  </filter>
+  <filter id="innerGlow" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+    <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 1 0 0 1  0 0 0.5 0 0.3  0 0 0 1 0" result="glow"/>
+    <feMerge>
+      <feMergeNode in="glow"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+  <filter id="bgShadow" x="-5%" y="-5%" width="115%" height="115%">
+    <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#00ff88" flood-opacity="0.15"/>
+  </filter>
+  <clipPath id="bgClip">
+    <rect x="20" y="20" width="472" height="472" rx="100" ry="100"/>
+  </clipPath>
 </defs>
 
-<g>
-  <path class="st194" d="M24.51,28.51H5.49c-2.21,0-4-1.79-4-4V5.49c0-2.21,1.79-4,4-4h19.03c2.21,0,4,1.79,4,4v19.03
-    C28.51,26.72,26.72,28.51,24.51,28.51z"/>
-  <g class="z-breathe">
-    <path class="st23" d="M15.47,7.1l-1.3,1.85c-0.2,0.29-0.54,0.47-0.9,0.47h-7.1V7.09C6.16,7.1,15.47,7.1,15.47,7.1z"/>
-    <polygon class="st23" points="24.3,7.1 13.14,22.91 5.7,22.91 16.86,7.1"/>
-    <path class="st23" d="M14.53,22.91l1.31-1.86c0.2-0.29,0.54-0.47,0.9-0.47h7.09v2.33H14.53z"/>
-  </g>
+<!-- Background rounded square -->
+<g filter="url(#bgShadow)">
+  <rect x="20" y="20" width="472" height="472" rx="100" ry="100" fill="url(#bgGrad)"/>
+  <!-- Subtle border glow -->
+  <rect x="20" y="20" width="472" height="472" rx="100" ry="100" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-opacity="0.3"/>
 </g>
+
+<!-- Background subtle highlight (3D depth on bg) -->
+<g clip-path="url(#bgClip)">
+  <rect x="20" y="20" width="472" height="200" rx="100" ry="100" fill="white" opacity="0.03"/>
+</g>
+
+<!-- G letter - 3D shadow layer (dark offset) -->
+<g transform="translate(6, 8)" opacity="0.5">
+  <path d="M346,222H238v56h52c-5,28-30,49-59,49c-34,0-61-27-61-61s27-61,61-61c15,0,29,6,40,15l39-39
+    c-21-20-49-33-79-33c-64,0-116,52-116,116s52,116,116,116c59,0,108-44,115-101L346,222z" 
+    fill="#003318"/>
+</g>
+
+<!-- G letter - Main 3D body -->
+<g filter="url(#shadow3d)">
+  <path d="M346,222H238v56h52c-5,28-30,49-59,49c-34,0-61-27-61-61s27-61,61-61c15,0,29,6,40,15l39-39
+    c-21-20-49-33-79-33c-64,0-116,52-116,116s52,116,116,116c59,0,108-44,115-101L346,222z" 
+    fill="url(#gGrad)"/>
+</g>
+
+<!-- G letter - 3D shine overlay -->
+<path d="M346,222H238v56h52c-5,28-30,49-59,49c-34,0-61-27-61-61s27-61,61-61c15,0,29,6,40,15l39-39
+  c-21-20-49-33-79-33c-64,0-116,52-116,116s52,116,116,116c59,0,108-44,115-101L346,222z" 
+  fill="url(#g3dTop)"/>
+
+<!-- G letter - Edge highlight (top-left light source) -->
+<path d="M346,222H238v56h52c-5,28-30,49-59,49c-34,0-61-27-61-61s27-61,61-61c15,0,29,6,40,15l39-39
+  c-21-20-49-33-79-33c-64,0-116,52-116,116s52,116,116,116c59,0,108-44,115-101L346,222z" 
+  fill="url(#gShine)" opacity="0.7"/>
+
+<!-- Inner cut stroke for 3D depth on G shape -->
+<path d="M346,222H238v56h52c-5,28-30,49-59,49c-34,0-61-27-61-61s27-61,61-61c15,0,29,6,40,15l39-39
+  c-21-20-49-33-79-33c-64,0-116,52-116,116s52,116,116,116c59,0,108-44,115-101L346,222z" 
+  fill="none" stroke="#66ffbb" stroke-width="2" stroke-opacity="0.3"/>
+
+<!-- Small specular highlight dot -->
+<ellipse cx="200" cy="180" rx="18" ry="12" fill="white" opacity="0.12" transform="rotate(-20 200 180)"/>
 </svg>
