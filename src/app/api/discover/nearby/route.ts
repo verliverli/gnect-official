@@ -70,21 +70,24 @@ export async function GET(request: NextRequest) {
       not_today: false,
       age: { gte: ageMin, lte: ageMax },
     }
-    // STRICT: Nearby ONLY shows users in the EXACT same country AND region
-    // Admin users see ALL countries/regions (they manage the platform)
-    // Non-admin WITHOUT a region CANNOT see anyone nearby (return empty)
-    // If regionParam is provided, show that specific region within the same country
+    // Location filtering logic:
+    // - Search by nickname → search ENTIRE country (so you can find anyone)
+    // - No search → same region only (nearby discovery)
+    // - Admin → sees everything
     if (!user.is_admin) {
       if (!user.country) {
         // No country set = cannot see anyone nearby — strict enforcement
         return NextResponse.json({ ok: true, data: [], nextCursor: null, total: 0 })
       }
       where.country = user.country
-      if (regionParam) {
+      if (search) {
+        // When searching by nickname, search across the ENTIRE country
+        // Don't limit to region — user is looking for someone specific
+      } else if (regionParam) {
         // Filter by specific region within same country
         where.region = regionParam
       } else {
-        // Default: same region as user
+        // Default: same region as user (nearby discovery)
         if (!user.region) {
           return NextResponse.json({ ok: true, data: [], nextCursor: null, total: 0 })
         }
@@ -114,6 +117,8 @@ export async function GET(request: NextRequest) {
     if (onlineOnly) where.is_online = true
 
     // Apply nickname search (case-insensitive partial match)
+    // SQLite is case-insensitive for ASCII by default with LIKE
+    // Using contains which maps to LIKE '%search%'
     if (search) {
       where.nickname = { contains: search }
     }
@@ -191,7 +196,24 @@ export async function GET(request: NextRequest) {
 
     // Sort in memory based on sort option
     // ALL sorts prioritize online users first as the primary sort key
-    if (sort === "nearby") {
+    // When searching, prioritize exact/near nickname matches first
+    if (search) {
+      // Search mode: best match first → online → last_seen
+      const searchLower = search.toLowerCase()
+      allUsers.sort((a, b) => {
+        // Exact match first
+        const aExact = a.nickname.toLowerCase() === searchLower ? 0 : 1
+        const bExact = b.nickname.toLowerCase() === searchLower ? 0 : 1
+        if (aExact !== bExact) return aExact - bExact
+        // Starts with search term
+        const aStarts = a.nickname.toLowerCase().startsWith(searchLower) ? 0 : 1
+        const bStarts = b.nickname.toLowerCase().startsWith(searchLower) ? 0 : 1
+        if (aStarts !== bStarts) return aStarts - bStarts
+        // Online users first
+        if (a.is_online !== b.is_online) return a.is_online ? -1 : 1
+        return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
+      })
+    } else if (sort === "nearby") {
       // Online first → same street → last_seen DESC
       const myStreet = user.street
       allUsers.sort((a, b) => {
