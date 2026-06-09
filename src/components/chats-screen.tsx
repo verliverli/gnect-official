@@ -1833,44 +1833,19 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
 
   // Pull-to-refresh state (chat list)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [pullDist, setPullDist] = useState(0)
   const pullStartY = useRef(0)
-  const pullDistance = useRef(0)
   const isPulling = useRef(false)
 
   const handlePullRefresh = useCallback(async () => {
     setIsRefreshing(true)
+    setPullDist(0)
     appCache.getState().setTimestamp('chatList', 0) // Force stale
     await fetchChats(true)
     setIsRefreshing(false)
   }, [fetchChats, appCache])
 
-  // Pull-to-refresh state (messages view)
-  const [isMessagesRefreshing, setIsMessagesRefreshing] = useState(false)
-  const msgPullStartY = useRef(0)
-  const msgPullDistance = useRef(0)
-  const msgIsPulling = useRef(false)
-
-  const handleMessagesPullRefresh = useCallback(async () => {
-    if (!activeChatId) return
-    setIsMessagesRefreshing(true)
-    try {
-      const res = await fetch(`/api/chat/${activeChatId}/open`, { credentials: 'same-origin' })
-      const d = await res.json()
-      if (d.ok) {
-        const freshMsgs = d.data.messages || []
-        setMessages(freshMsgs)
-        setMessagesCursor(d.data.nextCursor || null)
-        setMessagesHasMore(!!d.data.nextCursor)
-        setSelfDestructHours(d.data.selfDestructHours)
-        setChatRating(d.data.myRating)
-        dataStore.getState().setChatMessages(activeChatId, freshMsgs)
-      }
-    } catch {
-      // Silent fail
-    } finally {
-      setIsMessagesRefreshing(false)
-    }
-  }, [activeChatId, dataStore])
+  // Pull-to-refresh removed from messages view — only on chat list
 
   const renderChatList = () => (
     <div className="h-full flex flex-col">
@@ -1909,24 +1884,34 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
           const el = e.currentTarget
           if (el.scrollTop > 0) {
             isPulling.current = false
-            pullDistance.current = 0
+            setPullDist(0)
             return
           }
-          pullDistance.current = Math.max(0, e.touches[0].clientY - pullStartY.current)
+          const dist = Math.max(0, e.touches[0].clientY - pullStartY.current)
+          setPullDist(Math.min(dist, 150))
         }}
         onTouchEnd={() => {
-          if (isPulling.current && pullDistance.current > 80 && !isRefreshing) {
+          if (isPulling.current && pullDist > 80 && !isRefreshing) {
             handlePullRefresh()
           }
           isPulling.current = false
-          pullDistance.current = 0
+          setPullDist(0)
         }}
       >
-        {/* Pull-to-refresh indicator */}
-        {isRefreshing && (
-          <div className="flex items-center justify-center py-3 gap-2 text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-xs font-medium">Refreshing...</span>
+        {/* Pull-to-refresh indicator — visible while pulling AND while refreshing */}
+        {(pullDist > 20 || isRefreshing) && (
+          <div
+            className="flex items-center justify-center gap-2 text-muted-foreground transition-all"
+            style={{ height: isRefreshing ? 44 : Math.min(pullDist * 0.5, 60) }}
+          >
+            {isRefreshing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-xs font-medium">Refreshing...</span>
+              </>
+            ) : (
+              <RefreshCw className={`w-4 h-4 ${pullDist > 80 ? 'animate-spin text-primary' : ''}`} />
+            )}
           </div>
         )}
         {chatsLoading ? (
@@ -2265,43 +2250,11 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
         })()}
       </AnimatePresence>
 
-      {/* Messages Area — with pull-to-refresh */}
+      {/* Messages Area */}
       <div
         onScroll={handleMessageScroll}
-        onTouchStart={(e) => {
-          const el = e.currentTarget
-          if (el.scrollTop <= 0) {
-            msgPullStartY.current = e.touches[0].clientY
-            msgIsPulling.current = true
-          }
-        }}
-        onTouchMove={(e) => {
-          if (!msgIsPulling.current) return
-          const el = e.currentTarget
-          if (el.scrollTop > 0) {
-            msgIsPulling.current = false
-            msgPullDistance.current = 0
-            return
-          }
-          msgPullDistance.current = Math.max(0, e.touches[0].clientY - msgPullStartY.current)
-        }}
-        onTouchEnd={() => {
-          if (msgIsPulling.current && msgPullDistance.current > 80 && !isMessagesRefreshing) {
-            handleMessagesPullRefresh()
-          }
-          msgIsPulling.current = false
-          msgPullDistance.current = 0
-        }}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain gnect-scroll px-3 py-2"
       >
-        {/* Pull-to-refresh indicator for messages */}
-        {isMessagesRefreshing && (
-          <div className="flex items-center justify-center py-2 gap-2 text-muted-foreground">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            <span className="text-xs font-medium">Refreshing...</span>
-          </div>
-        )}
-
         {/* Load more button */}
         {messagesHasMore && (
           <div className="flex justify-center py-2 mb-2">
