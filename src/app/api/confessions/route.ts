@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
       return NextResponse.json({ ok: false, error: "Content is required" }, { status: 400 })
     }
-    if (content.length > 1000) {
-      return NextResponse.json({ ok: false, error: "Confession too long (max 1000 chars)" }, { status: 400 })
+    if (content.trim().length < 1000) {
+      return NextResponse.json({ ok: false, error: "Confession too short — minimum 1000 characters" }, { status: 400 })
     }
 
     // Validate category

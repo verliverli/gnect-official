@@ -572,8 +572,8 @@ function CreateConfessionModal({
       toast.error('Write your confession')
       return
     }
-    if (content.length > 1000) {
-      toast.error('Too long — max 1000 characters')
+    if (content.trim().length < 1000) {
+      toast.error('Too short — minimum 1000 characters')
       return
     }
 
@@ -657,15 +657,15 @@ function CreateConfessionModal({
             <textarea
               value={content}
               onChange={(e) => {
-                if (e.target.value.length <= 1000) setContent(e.target.value)
+                setContent(e.target.value)
               }}
-              placeholder="Spill it... nobody will know it's you 🤫"
+              placeholder="Spill it... minimum 1000 characters. Nobody will know it's you 🤫"
               className="w-full h-32 rounded-xl border border-border bg-background text-foreground text-sm p-3 resize-none focus:outline-none focus:border-green-500/50 placeholder:text-muted-foreground/40"
-              maxLength={1000}
+
             />
             <div className="flex items-center justify-between mt-1">
               <span className="text-[10px] text-muted-foreground/40">
-                {content.length}/1000
+                {content.length < 1000 ? `${1000 - content.length} more needed` : `${content.length} chars ✓`}
               </span>
             </div>
           </div>

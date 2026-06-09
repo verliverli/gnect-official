@@ -6,7 +6,7 @@ import {
   MessageCircle, Search, ArrowLeft, Send, ImagePlus,
   Check, CheckCheck, EyeOff, Lock, ChevronDown, Shield,
   Ban, Flag, XCircle, Camera, Reply, Trash2,
-  Ghost, Loader2, X, Smile, Image, Link2, Star, Mic
+  Ghost, Loader2, X, Smile, Image, Link2, Star, Mic, RefreshCw
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -1831,7 +1831,7 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   // RENDER: Chat List
   // ============================================
 
-  // Pull-to-refresh state
+  // Pull-to-refresh state (chat list)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const pullStartY = useRef(0)
   const pullDistance = useRef(0)
@@ -1843,6 +1843,34 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
     await fetchChats(true)
     setIsRefreshing(false)
   }, [fetchChats, appCache])
+
+  // Pull-to-refresh state (messages view)
+  const [isMessagesRefreshing, setIsMessagesRefreshing] = useState(false)
+  const msgPullStartY = useRef(0)
+  const msgPullDistance = useRef(0)
+  const msgIsPulling = useRef(false)
+
+  const handleMessagesPullRefresh = useCallback(async () => {
+    if (!activeChatId) return
+    setIsMessagesRefreshing(true)
+    try {
+      const res = await fetch(`/api/chat/${activeChatId}/open`, { credentials: 'same-origin' })
+      const d = await res.json()
+      if (d.ok) {
+        const freshMsgs = d.data.messages || []
+        setMessages(freshMsgs)
+        setMessagesCursor(d.data.nextCursor || null)
+        setMessagesHasMore(!!d.data.nextCursor)
+        setSelfDestructHours(d.data.selfDestructHours)
+        setChatRating(d.data.myRating)
+        dataStore.getState().setChatMessages(activeChatId, freshMsgs)
+      }
+    } catch {
+      // Silent fail
+    } finally {
+      setIsMessagesRefreshing(false)
+    }
+  }, [activeChatId, dataStore])
 
   const renderChatList = () => (
     <div className="h-full flex flex-col">
@@ -2237,11 +2265,43 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
         })()}
       </AnimatePresence>
 
-      {/* Messages Area */}
+      {/* Messages Area — with pull-to-refresh */}
       <div
         onScroll={handleMessageScroll}
+        onTouchStart={(e) => {
+          const el = e.currentTarget
+          if (el.scrollTop <= 0) {
+            msgPullStartY.current = e.touches[0].clientY
+            msgIsPulling.current = true
+          }
+        }}
+        onTouchMove={(e) => {
+          if (!msgIsPulling.current) return
+          const el = e.currentTarget
+          if (el.scrollTop > 0) {
+            msgIsPulling.current = false
+            msgPullDistance.current = 0
+            return
+          }
+          msgPullDistance.current = Math.max(0, e.touches[0].clientY - msgPullStartY.current)
+        }}
+        onTouchEnd={() => {
+          if (msgIsPulling.current && msgPullDistance.current > 80 && !isMessagesRefreshing) {
+            handleMessagesPullRefresh()
+          }
+          msgIsPulling.current = false
+          msgPullDistance.current = 0
+        }}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain gnect-scroll px-3 py-2"
       >
+        {/* Pull-to-refresh indicator for messages */}
+        {isMessagesRefreshing && (
+          <div className="flex items-center justify-center py-2 gap-2 text-muted-foreground">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span className="text-xs font-medium">Refreshing...</span>
+          </div>
+        )}
+
         {/* Load more button */}
         {messagesHasMore && (
           <div className="flex justify-center py-2 mb-2">

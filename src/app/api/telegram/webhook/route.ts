@@ -8,6 +8,41 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
+    // Handle callback queries FIRST (they don't have a `message` at top level)
+    if (body.callback_query?.data === 'help') {
+      const cbChatId = body.callback_query.message?.chat?.id
+      if (cbChatId) {
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: cbChatId,
+            text: "❓ **GNECT Help**\n\n🔒 **Privacy First:**\n• No phone, no email needed\n• Your data stays in your country\n• Disappearing messages\n• Discretion mode hides your presence\n\n🎭 **Confessions:**\n• Post anonymously — no one knows it's you\n• React with emojis only\n• Auto-delete after 7 days\n\n💬 **Chat:**\n• Self-destructing messages\n• View-once photos\n• Quick replies\n\n🆘 **Support:**\n• Use the in-app Support button\n• Or tap Open GNECT → Settings → Support\n\n🇶🇦🇸🇦🇦🇪🇵🇱 Available in Qatar, Saudi Arabia, UAE & Poland",
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[
+                {
+                  text: '🟢 Open GNECT',
+                  web_app: { url: WEB_APP_URL },
+                },
+              ]],
+            },
+          }),
+        })
+      }
+
+      // Answer callback query to dismiss the loading state
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callback_query_id: body.callback_query.id,
+        }),
+      })
+
+      return NextResponse.json({ ok: true })
+    }
+
     if (!body?.message) {
       return NextResponse.json({ ok: true })
     }
@@ -68,39 +103,6 @@ export async function POST(request: NextRequest) {
               },
             ]],
           },
-        }),
-      })
-    }
-
-    // Handle callback queries (button presses)
-    if (body.callback_query?.data === 'help') {
-      const cbChatId = body.callback_query.message?.chat?.id
-      if (cbChatId) {
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: cbChatId,
-            text: "❓ **GNECT Help**\n\n🔒 **Privacy First:**\n• No phone, no email needed\n• Your data stays in your country\n• Disappearing messages\n• Discretion mode hides your presence\n\n🎭 **Confessions:**\n• Post anonymously — no one knows it's you\n• React with emojis only\n• Auto-delete after 7 days\n\n💬 **Chat:**\n• Self-destructing messages\n• View-once photos\n• Quick replies\n\n🆘 **Support:**\n• Use the in-app Support button\n• Or tap Open GNECT → Settings → Support\n\n🇶🇦🇸🇦🇦🇪🇵🇱 Available in Qatar, Saudi Arabia, UAE & Poland",
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: [[
-                {
-                  text: '🟢 Open GNECT',
-                  web_app: { url: WEB_APP_URL },
-                },
-              ]],
-            },
-          }),
-        })
-      }
-
-      // Answer callback query to dismiss the loading state
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callback_query_id: body.callback_query.id,
         }),
       })
     }
