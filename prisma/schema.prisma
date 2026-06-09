@@ -88,6 +88,15 @@ model User {
   ratings_received     UserRating[]   @relation("Rated")
   group_memberships    GroupMember[]
   group_messages       GroupMessage[]
+  confessions          Confession[]
+  confession_reactions ConfessionReaction[]
+  confession_reports   ConfessionReport[]
+  hot_take_votes       HotTakeVote[]
+
+  // Daily engagement
+  login_streak       Int       @default(0)
+  last_login_date    DateTime?
+  longest_streak     Int       @default(0)
 
   @@index([nickname])
   @@index([country])
@@ -596,4 +605,113 @@ model GroupMessage {
   @@index([room_id, sent_at])
   @@index([sender_id])
   @@index([hard_delete_at])
+}
+
+// ============================================
+// CONFESSIONS — Phase 5
+// Anonymous wild secrets — no names, no traces
+// 7-day auto-delete, reactions only (no comments)
+// Country-filtered, category-tagged
+// ============================================
+
+model Confession {
+  id                String    @id @default(cuid())
+  user_id           String
+  content           String
+  category          String    // "sex_stories" | "regrets" | "fantasies" | "secrets" | "coming_out"
+  anonymous_alias   String    // Random like "Shadow_7X" — unique per confession
+  country           String    // Auto-tagged from user's country
+  reactions_summary String    @default("{}")  // JSON: {"🔥": 5, "😱": 3, "😈": 2, "💀": 1, "😍": 4}
+  total_reactions   Int       @default(0)
+  reports_count     Int       @default(0)
+  is_deleted        Boolean   @default(false)
+  is_pinned         Boolean   @default(false)
+  auto_delete_at    DateTime  // 7 days from creation
+  created_at        DateTime  @default(now())
+
+  author            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  reactions         ConfessionReaction[]
+  reports           ConfessionReport[]
+
+  @@index([user_id])
+  @@index([category])
+  @@index([country])
+  @@index([is_deleted])
+  @@index([created_at])
+  @@index([auto_delete_at])
+}
+
+model ConfessionReaction {
+  id             String   @id @default(cuid())
+  confession_id  String
+  user_id        String
+  emoji          String   // "🔥" | "😱" | "😈" | "💀" | "😍"
+  created_at     DateTime @default(now())
+
+  confession     Confession @relation(fields: [confession_id], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([confession_id, user_id])  // One reaction per user per confession
+  @@index([confession_id])
+  @@index([user_id])
+}
+
+model ConfessionReport {
+  id              String   @id @default(cuid())
+  confession_id   String
+  reporter_id     String
+  reason          String   // "Spam" | "Harassment" | "Underage" | "Illegal" | "Other"
+  created_at      DateTime @default(now())
+
+  confession      Confession @relation(fields: [confession_id], references: [id], onDelete: Cascade)
+  reporter        User       @relation(fields: [reporter_id], references: [id], onDelete: Cascade)
+
+  @@unique([confession_id, reporter_id])
+  @@index([confession_id])
+  @@index([reporter_id])
+}
+
+// ============================================
+// DAILY ENGAGEMENT — Phase 5
+// Retention hooks: Daily Dare, Hot Take, Login Streak
+// ============================================
+
+model DailyDare {
+  id          String   @id @default(cuid())
+  text        String   // The dare text (e.g. "Send a voice note to someone new today")
+  category    String   // "social" | "flirty" | "bold" | "chill"
+  date        String   // "2026-06-09" format — one dare per day
+  created_at  DateTime @default(now())
+
+  @@unique([date])
+}
+
+model HotTake {
+  id          String   @id @default(cuid())
+  question    String   // "Sleepover or one-night stand?"
+  option_a    String   // "Sleepover"
+  option_b    String   // "One-night stand"
+  votes_a     Int      @default(0)
+  votes_b     Int      @default(0)
+  date        String   // "2026-06-09" format — one hot take per day
+  created_at  DateTime @default(now())
+
+  votes       HotTakeVote[]
+
+  @@unique([date])
+}
+
+model HotTakeVote {
+  id          String   @id @default(cuid())
+  hot_take_id String
+  user_id     String
+  choice      String   // "a" | "b"
+  created_at  DateTime @default(now())
+
+  hot_take    HotTake  @relation(fields: [hot_take_id], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([hot_take_id, user_id])  // One vote per user per hot take
+  @@index([hot_take_id])
+  @@index([user_id])
 }

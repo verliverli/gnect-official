@@ -129,6 +129,16 @@ export async function GET(request?: NextRequest) {
       },
     })
 
+    // ===== 7.5. Clean expired confessions (7-day auto-delete) =====
+    const expiredConfessions = await db.confession.deleteMany({
+      where: {
+        auto_delete_at: { lte: now },
+      },
+    })
+    if (expiredConfessions.count > 0) {
+      console.log(`[CRON] Deleted ${expiredConfessions.count} expired confessions`)
+    }
+
     // ===== 8. Clean up expired rate limits =====
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
     const expiredRateLimits = await db.rateLimit.deleteMany({
@@ -294,6 +304,7 @@ export async function GET(request?: NextRequest) {
       expiredPosts: expiredPosts.count,
       expiredComments: expiredComments.count,
       expiredGroupMessages: expiredGroupMessages.count,
+      expiredConfessions: expiredConfessions.count,
       expiredRateLimits: expiredRateLimits.count,
       resetNotToday,
       sentScheduledBroadcasts: sentBroadcasts,

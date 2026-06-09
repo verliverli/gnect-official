@@ -10,6 +10,7 @@ import { useAppCache, dedupFetch } from '@/lib/app-cache'
 import { BannerCard } from '@/components/discover/banner-card'
 import { SpotlightView } from '@/components/discover/spotlight-view'
 import { SavedProfilesPanel } from '@/components/discover/saved-profiles-panel'
+import { DailyEngagement } from '@/components/daily-engagement'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -1087,6 +1088,11 @@ export function DiscoverScreen({ onOpenChat }: { onOpenChat?: (userId: string) =
             </div>
           ))}
         </div>
+      )}
+
+      {/* ===== DAILY ENGAGEMENT WIDGET ===== */}
+      {activeTab === 'nearby' && (
+        <DailyEngagement />
       )}
 
       {/* Pull-to-refresh indicator */}

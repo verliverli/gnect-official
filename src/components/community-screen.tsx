@@ -10,12 +10,14 @@ import { useAppCache, dedupFetch } from '@/lib/app-cache'
 import { PostCard, type CommunityPost } from '@/components/community/post-card'
 import { CreatePostSheet } from '@/components/community/create-post-sheet'
 import { PostDetailView } from '@/components/community/post-detail-view'
+import { ConfessionsScreen } from '@/components/confessions-screen'
 import { toast } from 'sonner'
 
 // ============================================
 // Types
 // ============================================
 
+type SectionTab = 'ask' | 'confessions'
 type CommunityTab = 'new' | 'hot' | 'my'
 type CategoryFilter = 'SFW' | 'NSFW' | 'All'
 
@@ -30,6 +32,9 @@ export function CommunityScreen() {
 
   // Read cached data from store for instant rendering
   const cachedPosts = dataStore((s) => s.communityPosts)
+
+  // Section tab state (Ask vs Confessions)
+  const [sectionTab, setSectionTab] = useState<SectionTab>('ask')
 
   // Tab & filter state
   const [activeTab, setActiveTab] = useState<CommunityTab>('new')
@@ -341,132 +346,175 @@ export function CommunityScreen() {
   // ========================================
   return (
     <div className="h-full flex flex-col">
-      {/* Tab Bar — New | Hot | My Posts */}
+      {/* Section Tab Bar — Ask | Confessions */}
       <div className="flex items-center border-b border-border/50 shrink-0">
-        {tabs.map((tab) => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.key}
-              role="tab"
-              aria-selected={activeTab === tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors relative ${
-                activeTab === tab.key ? 'text-primary' : 'text-muted-foreground'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-              {activeTab === tab.key && (
-                <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-primary rounded-full gnect-tab-fade" />
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Category Filter Pills */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border/30 bg-background/95 shrink-0">
-        {categoryFilters.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCategoryFilter(cat)}
-            aria-pressed={categoryFilter === cat}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-              categoryFilter === cat
-                ? cat === 'SFW'
-                  ? 'bg-primary/15 text-primary border-primary/30'
-                  : cat === 'NSFW'
-                  ? 'bg-red-500/15 text-red-500 border-red-500/30'
-                  : 'bg-primary/15 text-primary border-primary/30'
-                : 'bg-card text-muted-foreground border-border hover:bg-card/80'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Pull-to-refresh indicator */}
-      {pullDistance > 0 && (
-        <div
-          className="flex items-center justify-center py-1 transition-all shrink-0"
-          style={{ height: pullDistance }}
+        <button
+          role="tab"
+          aria-selected={sectionTab === 'ask'}
+          onClick={() => setSectionTab('ask')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors relative ${
+            sectionTab === 'ask' ? 'text-primary' : 'text-muted-foreground'
+          }`}
         >
-          <RefreshCw
-            className={`w-4 h-4 text-primary ${pullDistance > 50 ? 'animate-spin' : ''}`}
-          />
+          <MessageSquare className="w-3.5 h-3.5" />
+          Ask
+          {sectionTab === 'ask' && (
+            <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-primary rounded-full gnect-tab-fade" />
+          )}
+        </button>
+        <button
+          role="tab"
+          aria-selected={sectionTab === 'confessions'}
+          onClick={() => setSectionTab('confessions')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors relative ${
+            sectionTab === 'confessions' ? 'text-green-500' : 'text-muted-foreground'
+          }`}
+        >
+          🎭 Confessions
+          {sectionTab === 'confessions' && (
+            <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-green-500 rounded-full gnect-tab-fade" />
+          )}
+        </button>
+      </div>
+
+      {/* Confessions Section */}
+      {sectionTab === 'confessions' && (
+        <div className="flex-1 overflow-hidden">
+          <ConfessionsScreen />
         </div>
       )}
 
-      {/* Content Area */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        className="flex-1 overflow-y-auto overscroll-contain gnect-scroll relative"
-      >
-        <div key={`${activeTab}-${categoryFilter}`} className="gnect-tab-fade">
-            {loading ? (
-              renderSkeletons()
-            ) : posts.length === 0 ? (
-              renderEmpty()
-            ) : (
-              <div className="px-4 space-y-2.5 py-2 pb-24">
-                {posts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    onTap={setDetailPostId}
-                    onUpvoteToggle={handleUpvoteToggle}
-                  />
-                ))}
+      {/* Ask Section (existing community) */}
+      {sectionTab === 'ask' && (
+        <>
+          {/* Sub-Tab Bar — New | Hot | My Posts */}
+          <div className="flex items-center border-b border-border/50 shrink-0">
+            {tabs.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  role="tab"
+                  aria-selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors relative ${
+                    activeTab === tab.key ? 'text-primary' : 'text-muted-foreground'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                  {activeTab === tab.key && (
+                    <div className="absolute bottom-0 left-2 right-2 h-[3px] bg-primary rounded-full gnect-tab-fade" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
 
-                {loadingMore && (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-border/30 bg-background/95 shrink-0">
+            {categoryFilters.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                aria-pressed={categoryFilter === cat}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                  categoryFilter === cat
+                    ? cat === 'SFW'
+                      ? 'bg-primary/15 text-primary border-primary/30'
+                      : cat === 'NSFW'
+                      ? 'bg-red-500/15 text-red-500 border-red-500/30'
+                      : 'bg-primary/15 text-primary border-primary/30'
+                    : 'bg-card text-muted-foreground border-border hover:bg-card/80'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Pull-to-refresh indicator */}
+          {pullDistance > 0 && (
+            <div
+              className="flex items-center justify-center py-1 transition-all shrink-0"
+              style={{ height: pullDistance }}
+            >
+              <RefreshCw
+                className={`w-4 h-4 text-primary ${pullDistance > 50 ? 'animate-spin' : ''}`}
+              />
+            </div>
+          )}
+
+          {/* Content Area */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            className="flex-1 overflow-y-auto overscroll-contain gnect-scroll relative"
+          >
+            <div key={`${activeTab}-${categoryFilter}`} className="gnect-tab-fade">
+                {loading ? (
+                  renderSkeletons()
+                ) : posts.length === 0 ? (
+                  renderEmpty()
+                ) : (
+                  <div className="px-4 space-y-2.5 py-2 pb-24">
+                    {posts.map((post) => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        onTap={setDetailPostId}
+                        onUpvoteToggle={handleUpvoteToggle}
+                      />
+                    ))}
+
+                    {loadingMore && (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      </div>
+                    )}
+
+                    {!hasMore && posts.length > 0 && (
+                      <div className="text-center py-6 text-xs text-muted-foreground/50">
+                        That&apos;s all for now
+                      </div>
+                    )}
                   </div>
                 )}
+            </div>
+          </div>
 
-                {!hasMore && posts.length > 0 && (
-                  <div className="text-center py-6 text-xs text-muted-foreground/50">
-                    That&apos;s all for now
-                  </div>
-                )}
-              </div>
-            )}
-        </div>
-      </div>
+          {/* FAB — Create Post */}
+          <button
+            onClick={() => setShowCreateSheet(true)}
+            className="absolute bottom-4 right-4 h-14 w-14 rounded-full bg-primary text-primary-foreground gnect-fab flex items-center justify-center active:scale-90 transition-transform z-10"
+            aria-label="Create new post"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
 
-      {/* FAB — Create Post */}
-      <button
-        onClick={() => setShowCreateSheet(true)}
-        className="absolute bottom-4 right-4 h-14 w-14 rounded-full bg-primary text-primary-foreground gnect-fab flex items-center justify-center active:scale-90 transition-transform z-10"
-        aria-label="Create new post"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
-
-      {/* Create Post Sheet */}
-      <CreatePostSheet
-        open={showCreateSheet}
-        onOpenChange={setShowCreateSheet}
-        onPostCreated={handlePostCreated}
-      />
-
-      {/* Post Detail View */}
-      <AnimatePresence>
-        {detailPostId && (
-          <PostDetailView
-            key={detailPostId}
-            postId={detailPostId}
-            onClose={handleDetailClose}
-            onPostDeleted={handlePostDeleted}
+          {/* Create Post Sheet */}
+          <CreatePostSheet
+            open={showCreateSheet}
+            onOpenChange={setShowCreateSheet}
+            onPostCreated={handlePostCreated}
           />
-        )}
-      </AnimatePresence>
+
+          {/* Post Detail View */}
+          <AnimatePresence>
+            {detailPostId && (
+              <PostDetailView
+                key={detailPostId}
+                postId={detailPostId}
+                onClose={handleDetailClose}
+                onPostDeleted={handlePostDeleted}
+              />
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   )
 }

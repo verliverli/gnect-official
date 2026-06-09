@@ -343,3 +343,28 @@ export const DEFAULT_NOTIFICATION_SETTINGS = {
   discreetNotifStyle: "default",
   admin_broadcast: true,
 } as const
+
+// Confession Categories
+export const CONFESSION_CATEGORIES = [
+  { id: "sex_stories", label: "🔥 Sex Stories", emoji: "🔥" },
+  { id: "regrets", label: "💔 Regrets", emoji: "💔" },
+  { id: "fantasies", label: "😈 Fantasies", emoji: "😈" },
+  { id: "secrets", label: "🤫 Secrets", emoji: "🤫" },
+  { id: "coming_out", label: "🏳️‍🌈 Coming Out", emoji: "🏳️‍🌈" },
+] as const
+
+export type ConfessionCategory = typeof CONFESSION_CATEGORIES[number]['id']
+
+// Confession Reactions
+export const CONFESSION_REACTIONS = ["🔥", "😱", "😈", "💀", "😍"] as const
+
+// Confession auto-delete: 7 days
+export const CONFESSION_AUTO_DELETE_DAYS = 7
+
+// Anonymous alias generator
+export function generateAnonymousAlias(): string {
+  const prefixes = ['Shadow', 'Ghost', 'Night', 'Dark', 'Wild', 'Secret', 'Hidden', 'Mystic', 'Silent', 'Deep']
+  const suffix = Math.random().toString(36).substring(2, 4).toUpperCase()
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)]
+  return `${prefix}_${suffix}`
+}
