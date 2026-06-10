@@ -23,6 +23,7 @@ import { DeleteAccount } from '@/components/account-deletion'
 import { SupportScreen } from '@/components/support/support-screen'
 import { GeometricAvatar } from '@/components/geometric-avatar'
 import { InstallGuide } from '@/components/install-guide'
+import { InstallAppButton } from '@/components/install-app-button'
 
 interface ProfilePanelProps {
   onClose: () => void
@@ -872,14 +873,8 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
             </div>
           </SectionCard>
 
-          {/* Install App */}
-          <button onClick={() => setShowInstallGuide(true)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors">
-            <Download className="w-5 h-5 text-primary" />
-            <div className="flex-1 text-left">
-              <p className="text-sm font-medium">Install App</p>
-              <p className="text-[10px] text-muted-foreground">Add to home screen for the best experience</p>
-            </div>
-          </button>
+          {/* Install App — one-click when browser supports it, otherwise opens guide */}
+          <InstallAppButton onOpenGuide={() => setShowInstallGuide(true)} />
 
           {/* BOSS MODE — Admin Panel — only for admins */}
           {isAdmin && (

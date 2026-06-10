@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Bell, Shield, Compass, MessageCircle, Users, EyeOff, HelpCircle, BookOpen, LifeBuoy, Lightbulb, X, Gift, Ban, Shuffle } from 'lucide-react'
+import { Bell, Shield, Compass, MessageCircle, Users, EyeOff, HelpCircle, BookOpen, LifeBuoy, Lightbulb, X, Gift, Ban, Shuffle, Download } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { io, Socket } from 'socket.io-client'
 import { GeometricAvatar } from '@/components/geometric-avatar'
@@ -28,6 +28,7 @@ import { ErrorCatcher } from '@/components/error-catcher'
 import { SupportScreen } from '@/components/support/support-screen'
 import { FeedbackForm } from '@/components/feedback-form'
 import { Button } from '@/components/ui/button'
+import { usePwaInstall } from '@/lib/use-pwa-install'
 
 type Screen = 'discover' | 'chats' | 'community' | 'mixer'
 
@@ -37,6 +38,11 @@ export function AppShell() {
   const dataStore = useDataStore
   const appCache = useAppCache
   const [activeScreen, setActiveScreen] = useState<Screen>('discover')
+
+  // PWA install prompt — shows floating banner if browser supports install
+  const { canInstall, isInstalled, promptInstall, isLoading } = usePwaInstall()
+  const [dismissedInstall, setDismissedInstall] = useState(false)
+  const showInstallBanner = canInstall && !isInstalled && !dismissedInstall
 
   // === Aggressive prefetch: fire all data fetches on app mount ===
   usePrefetchAll()
@@ -806,6 +812,47 @@ export function AppShell() {
               <p className="text-destructive-foreground text-xl font-bold mt-4">Screenshot blocked</p>
               <p className="text-destructive-foreground/70 text-sm mt-1">Content is protected</p>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PWA Install Banner — floating bottom card when browser supports install */}
+      <AnimatePresence>
+        {showInstallBanner && user && (
+          <motion.div
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 60 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="fixed bottom-16 left-3 right-3 z-40 rounded-2xl bg-card/95 backdrop-blur-xl border border-primary/20 shadow-lg shadow-primary/5 p-3 flex items-center gap-3 safe-bottom"
+          >
+            <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+              <Download className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Install GNECT</p>
+              <p className="text-[10px] text-muted-foreground">One tap — no app store needed</p>
+            </div>
+            <Button
+              size="sm"
+              onClick={async () => {
+                const accepted = await promptInstall()
+                if (accepted) {
+                  toast.success('GNECT installed!', { description: 'Find it on your home screen' })
+                }
+              }}
+              disabled={isLoading}
+              className="shrink-0 rounded-xl font-bold"
+            >
+              {isLoading ? '...' : 'Install'}
+            </Button>
+            <button
+              onClick={() => setDismissedInstall(true)}
+              className="shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Dismiss install banner"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -97,7 +97,24 @@ export default {
       }
     }
 
-    return new Response(JSON.stringify({ error: 'Not found' }), { 
+    // Root info page
+    if (url.pathname === '/' || url.pathname === '') {
+      return new Response(JSON.stringify({
+        service: 'GNECT Media Proxy',
+        version: '1.0.0',
+        status: 'operational',
+        endpoints: {
+          health: '/health',
+          upload: '/bot/sendPhoto (POST)',
+          file: '/file/:path (GET)',
+          api: '/bot/:method (POST)',
+        },
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Not found', hint: 'See / for available endpoints' }), { 
       status: 404, 
       headers: { 'Content-Type': 'application/json', ...corsHeaders } 
     });
