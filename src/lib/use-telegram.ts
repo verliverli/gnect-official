@@ -34,6 +34,8 @@ interface TelegramWebApp {
   colorScheme: 'light' | 'dark'
   isExpanded: boolean
   enableClosingConfirmation: () => void
+  disableVerticalSwipes: () => void
+  initData: string
   HapticFeedback: {
     impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
     notificationOccurred: (type: 'error' | 'success' | 'warning') => void
@@ -76,6 +78,13 @@ export function useTelegram() {
 
       // Enable closing confirmation (prevent accidental back-swipe)
       webapp.enableClosingConfirmation()
+
+      // Disable vertical swipes to close MiniApp
+      // Users can ONLY close using the X button in the header
+      // This prevents pull-to-close from interfering with pull-to-refresh inside the app
+      if (typeof webapp.disableVerticalSwipes === 'function') {
+        webapp.disableVerticalSwipes()
+      }
     }
   }, [])
 

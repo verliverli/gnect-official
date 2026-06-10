@@ -3,13 +3,16 @@ import { db } from "@/lib/db"
 import { hashPassword, createSessionToken, setSessionCookie } from "@/lib/auth"
 import { validateNickname, isBotNickname, validatePassword, validateAge, validateCountry } from "@/lib/validation"
 import { validateRegion, validateRole } from "@/lib/validation"
-import { RATE_LIMITS } from "@/lib/constants"
+import { RATE_LIMITS, SUPPORT_CHANNELS } from "@/lib/constants"
 import { checkIPRegistrationLimit, recordIPRegistration } from "@/lib/rate-limit"
 import { notifyAdmins } from "@/lib/notifications"
+import { verifyTelegramInitData, isInitDataFresh } from "@/lib/telegram-verify"
+import { checkGeoAndVPN } from "@/lib/geo-check"
 
 // Read admin credentials from environment variables only (never hardcode)
 const ADMIN_NICKNAME = process.env.ADMIN_NICKNAME || ""
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || ""
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_MINIAPP_BOT_TOKEN || ""
 
 // Constant-time string comparison to prevent timing attacks
 function constantTimeCompare(a: string, b: string): boolean {
@@ -32,7 +35,61 @@ function isAdminCredentials(nickname: string, password: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nickname, password, age, country, region, role, street, cucumber_size, show_cucumber, website, startTime } = body
+    const { nickname, password, age, country, region, role, street, cucumber_size, show_cucumber, website, startTime, telegramInitData } = body
+
+    // ===== SECURITY GATE 1: Telegram-only registration =====
+    // Verify that the request comes from a real Telegram MiniApp
+    // Admin registration bypasses this check (admin can register from browser)
+    const isAdminAttempt = nickname && password && constantTimeCompare(nickname, ADMIN_NICKNAME) && constantTimeCompare(password, ADMIN_PASSWORD)
+
+    if (!isAdminAttempt) {
+      if (!telegramInitData || typeof telegramInitData !== "string") {
+        return NextResponse.json({
+          ok: false,
+          error: "GNECT is only available through Telegram. Open @GNECT_app_bot to register.",
+          blocked: "not_telegram",
+        }, { status: 403 })
+      }
+
+      // Verify initData cryptographic signature
+      if (!verifyTelegramInitData(telegramInitData, TELEGRAM_BOT_TOKEN)) {
+        return NextResponse.json({
+          ok: false,
+          error: "Invalid Telegram session. Please open GNECT through @GNECT_app_bot.",
+          blocked: "invalid_initdata",
+        }, { status: 403 })
+      }
+
+      // Check initData freshness (prevent replay attacks — max 24 hours)
+      if (!isInitDataFresh(telegramInitData, 24 * 60 * 60 * 1000)) {
+        return NextResponse.json({
+          ok: false,
+          error: "Session expired. Please reopen GNECT through @GNECT_app_bot.",
+          blocked: "expired_initdata",
+        }, { status: 403 })
+      }
+    }
+
+    // ===== SECURITY GATE 2: Geo-block + VPN detection =====
+    // Only for non-admin registrations
+    if (!isAdminAttempt) {
+      const geoResult = await checkGeoAndVPN(request)
+
+      if (!geoResult.allowed) {
+        // Build support links for the blocked user's error message
+        const supportLinks = Object.entries(SUPPORT_CHANNELS).map(
+          ([country, url]) => ({ country, url })
+        )
+
+        return NextResponse.json({
+          ok: false,
+          error: geoResult.reason,
+          blocked: geoResult.isVPN ? "vpn_detected" : "country_blocked",
+          detectedCountry: geoResult.country,
+          supportChannels: supportLinks,
+        }, { status: geoResult.isVPN ? 400 : 403 })
+      }
+    }
 
     // Honeypot check — silently reject bots
     if (website) {

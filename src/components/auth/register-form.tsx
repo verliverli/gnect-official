@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Eye, EyeOff, Check, X, Loader2, Lock } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Check, X, Loader2, Lock, Shield, MapPin, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthStore } from '@/lib/store'
-import { COUNTRIES, COUNTRY_NAMES, getRegionsForCountry, getCountryFlag, isValidCountry, isValidRegionForCountry, ROLES } from '@/lib/constants'
+import { COUNTRIES, COUNTRY_NAMES, getRegionsForCountry, getCountryFlag, isValidCountry, isValidRegionForCountry, ROLES, SUPPORT_CHANNELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { PasswordWarningGate, PasswordSuccessWarning } from '@/components/auth/password-warning'
 
@@ -18,6 +18,13 @@ interface RegisterFormProps {
 }
 
 type NicknameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+
+type BlockedState = null | 'not_telegram' | 'invalid_initdata' | 'expired_initdata' | 'vpn_detected' | 'country_blocked' | 'geo_error'
+
+interface SupportLink {
+  country: string
+  url: string
+}
 
 export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const { setUser } = useAuthStore()
@@ -37,10 +44,15 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountTimeRef = useRef(Date.now())
 
+  // Blocked state for registration security gates
+  const [blockedState, setBlockedState] = useState<BlockedState>(null)
+  const [blockedMessage, setBlockedMessage] = useState('')
+  const [supportLinks, setSupportLinks] = useState<SupportLink[]>([])
+
   // Password warning gates
   const [showPasswordWarning, setShowPasswordWarning] = useState(true)
   const [showPasswordSavedConfirmation, setShowPasswordSavedConfirmation] = useState(false)
-  const [pendingUser, setPendingUser] = useState<unknown>(null)
+  const [pendingUser, setPendingUser] = useState<Record<string, unknown> | null>(null)
 
   useEffect(() => {
     mountTimeRef.current = Date.now()
@@ -92,6 +104,12 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       toast.error('Please choose an available nickname')
       return
     }
+
+    // Get Telegram initData for registration verification
+    const telegramInitData = typeof window !== 'undefined' && window.Telegram?.WebApp?.initData
+      ? window.Telegram.WebApp.initData
+      : ''
+
     setLoading(true)
     try {
       const body: Record<string, unknown> = {
@@ -103,6 +121,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         role,
         website: '',
         startTime: mountTimeRef.current,
+        telegramInitData,
       }
 
       // Optional fields
@@ -111,7 +130,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       if (showCucumber) body.show_cucumber = true
 
       // Retry up to 2 times on server errors (cold start safeguard)
-      let data: { ok?: boolean; user?: unknown; error?: string; token?: string } = {}
+      let data: { ok?: boolean; user?: unknown; error?: string; token?: string; blocked?: string; supportChannels?: SupportLink[] } = {}
       for (let attempt = 0; attempt < 3; attempt++) {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
@@ -120,6 +139,18 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
           body: JSON.stringify(body),
         })
         data = await res.json()
+
+        // Handle security block responses
+        if (data.blocked) {
+          setBlockedState(data.blocked as BlockedState)
+          setBlockedMessage(data.error || 'Registration blocked')
+          if (data.supportChannels) {
+            setSupportLinks(data.supportChannels)
+          }
+          setLoading(false)
+          return
+        }
+
         // If server error (500), wait and retry — cold start may not have loaded env yet
         if (res.status >= 500 && attempt < 2) {
           await new Promise((r) => setTimeout(r, 1500))
@@ -156,11 +187,100 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       <PasswordSuccessWarning
         onEnter={() => {
           if (pendingUser) {
-            setUser(pendingUser)
+            setUser(pendingUser as any)
             toast.success('Account created!')
           }
         }}
       />
+    )
+  }
+
+  // Blocked state — show friendly error with support links
+  if (blockedState) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+        className="min-h-screen bg-background flex items-center justify-center p-4"
+      >
+        <div className="max-w-sm w-full space-y-6 text-center">
+          {/* Icon based on block type */}
+          <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+            {blockedState === 'vpn_detected' ? (
+              <Shield className="w-8 h-8 text-destructive" />
+            ) : blockedState === 'not_telegram' || blockedState === 'invalid_initdata' || blockedState === 'expired_initdata' ? (
+              <MessageCircle className="w-8 h-8 text-destructive" />
+            ) : (
+              <MapPin className="w-8 h-8 text-destructive" />
+            )}
+          </div>
+
+          {/* Title */}
+          <h2 className="text-xl font-bold text-foreground">
+            {blockedState === 'vpn_detected'
+              ? 'VPN Detected'
+              : blockedState === 'not_telegram'
+              ? 'Telegram Required'
+              : blockedState === 'country_blocked'
+              ? 'Not Available in Your Region'
+              : blockedState === 'geo_error'
+              ? 'Location Verification Failed'
+              : 'Access Denied'}
+          </h2>
+
+          {/* Message */}
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {blockedMessage}
+          </p>
+
+          {/* Telegram bot link for non-Telegram users */}
+          {(blockedState === 'not_telegram' || blockedState === 'invalid_initdata' || blockedState === 'expired_initdata') && (
+            <a
+              href="https://t.me/GNECT_app_bot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold gnect-press gnect-transition"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Open @GNECT_app_bot
+            </a>
+          )}
+
+          {/* Support channel links */}
+          {(blockedState === 'country_blocked' || blockedState === 'vpn_detected' || blockedState === 'geo_error') && supportLinks.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground font-medium">Think this is a mistake? Contact support:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {supportLinks.map((link) => (
+                  <a
+                    key={link.country}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium gnect-transition hover:bg-secondary/80"
+                  >
+                    {link.country === 'Poland' && '🇵🇱'}
+                    {link.country === 'Qatar' && '🇶🇦'}
+                    {link.country === 'Saudi Arabia' && '🇸🇦'}
+                    {link.country === 'UAE' && '🇦🇪'}
+                    {link.country} Support
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Back to login */}
+          <button
+            type="button"
+            onClick={() => setBlockedState(null)}
+            className="text-sm text-muted-foreground gnect-transition hover:text-foreground"
+          >
+            ← Go back
+          </button>
+        </div>
+      </motion.div>
     )
   }
 
