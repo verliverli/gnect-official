@@ -1,6 +1,6 @@
 'use client'
 
-import { X, Smartphone, Download, Apple, Monitor, Bell, Wifi, Shield, Check, Loader2, Package } from 'lucide-react'
+import { X, Smartphone, Download, Apple, Monitor, Bell, Wifi, Shield, Check, Loader2, Package, MessageCircle, Heart, Users, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import { usePwaInstall } from '@/lib/use-pwa-install'
@@ -22,7 +22,7 @@ interface InstallGuideProps {
 export function InstallGuide({ onClose }: InstallGuideProps) {
   const { canInstall, isInstalled, promptInstall, isLoading } = usePwaInstall()
 
-  // Detect platform — compute once, no setState needed
+  // Detect platform
   const [platform] = useState<'android' | 'ios' | 'desktop'>(() => {
     if (typeof navigator === 'undefined') return 'desktop'
     const ua = navigator.userAgent
@@ -62,11 +62,9 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
 
   const handleDownloadApk = () => {
     if (apkInfo?.downloadUrl) {
-      // Track download event
       try {
         fetch('/api/download', { method: 'POST', credentials: 'same-origin' }).catch(() => {})
       } catch {}
-      // Trigger download
       window.open(apkInfo.downloadUrl, '_blank')
       toast.success('Download started!', { description: 'Open the APK file to install' })
     }
@@ -104,7 +102,7 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
       <div className="flex-1 overflow-y-auto overscroll-contain gnect-scroll">
         <div className="px-4 py-4 space-y-5">
 
-          {/* APK DOWNLOAD — for Android users, the fastest way */}
+          {/* APK DOWNLOAD — for Android users */}
           {platform === 'android' && apkInfo?.available && !isInstalled && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -184,6 +182,43 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
             </div>
           )}
 
+          {/* App Features — what you get */}
+          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20">
+            <h3 className="text-sm font-semibold text-primary mb-3 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              What You Get in the App
+            </h3>
+            <div className="space-y-2.5">
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Private Chat</p>
+                  <p className="text-xs text-muted-foreground">1-on-1 encrypted conversations with auto-delete</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Heart className="w-4 h-4 text-rose-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Confessions</p>
+                  <p className="text-xs text-muted-foreground">Post and read anonymous confessions from your area</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Users className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Mixer Groups</p>
+                  <p className="text-xs text-muted-foreground">Group chats by interest — join or create your own</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Benefits banner */}
           <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20">
             <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
@@ -206,120 +241,117 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
             </div>
           </div>
 
-          {/* Android Instructions — show if APK not available AND can't auto-install */}
-          {platform === 'android' && !apkInfo?.available && !canInstall && !isInstalled && (
-            <div className="space-y-3">
-              <h3 className="text-base font-semibold flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-green-500" />
-                Android
-              </h3>
-              <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
-                <ol className="space-y-3">
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">1</span>
-                    <div>
-                      <p className="text-sm font-medium">Open GNECT in Chrome</p>
-                      <p className="text-xs text-muted-foreground">Visit gnect.vercel.app in Chrome browser</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">2</span>
-                    <div>
-                      <p className="text-sm font-medium">Tap the menu ⋮</p>
-                      <p className="text-xs text-muted-foreground">Three dots in the top-right corner</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">3</span>
-                    <div>
-                      <p className="text-sm font-medium">Tap &quot;Add to Home Screen&quot;</p>
-                      <p className="text-xs text-muted-foreground">Or &quot;Install app&quot; if Chrome shows the install banner</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">✓</span>
-                    <div>
-                      <p className="text-sm font-medium">GNECT is now on your home screen!</p>
-                      <p className="text-xs text-muted-foreground">Opens like a native app, no browser bars</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
+          {/* ========== ANDROID INSTRUCTIONS — ALWAYS SHOW ========== */}
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold flex items-center gap-2">
+              <Smartphone className="w-5 h-5 text-green-500" />
+              Android
+            </h3>
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+              {platform === 'android' && canInstall && !isInstalled ? (
+                <p className="text-xs text-emerald-400 font-medium mb-2">Tap the &quot;Install GNECT Now&quot; button above for one-tap install, or follow these steps:</p>
+              ) : null}
+              <ol className="space-y-3">
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-green-500/10 text-green-400 text-xs font-bold flex items-center justify-center">1</span>
+                  <div>
+                    <p className="text-sm font-medium">Open GNECT in Chrome</p>
+                    <p className="text-xs text-muted-foreground">Visit gnect.vercel.app in Chrome browser</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-green-500/10 text-green-400 text-xs font-bold flex items-center justify-center">2</span>
+                  <div>
+                    <p className="text-sm font-medium">Tap the menu ⋮</p>
+                    <p className="text-xs text-muted-foreground">Three dots in the top-right corner</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-green-500/10 text-green-400 text-xs font-bold flex items-center justify-center">3</span>
+                  <div>
+                    <p className="text-sm font-medium">Tap &quot;Add to Home Screen&quot;</p>
+                    <p className="text-xs text-muted-foreground">Or &quot;Install app&quot; if Chrome shows the install banner</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center">✓</span>
+                  <div>
+                    <p className="text-sm font-medium">GNECT is now on your home screen!</p>
+                    <p className="text-xs text-muted-foreground">Opens like a native app, no browser bars</p>
+                  </div>
+                </li>
+              </ol>
             </div>
-          )}
+          </div>
 
-          {/* iOS Instructions */}
-          {platform === 'ios' && !isInstalled && (
-            <div className="space-y-3">
-              <h3 className="text-base font-semibold flex items-center gap-2">
-                <Apple className="w-5 h-5 text-foreground" />
-                iPhone / iPad
-              </h3>
-              <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
-                <ol className="space-y-3">
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">1</span>
-                    <div>
-                      <p className="text-sm font-medium">Open GNECT in Safari</p>
-                      <p className="text-xs text-muted-foreground">Must use Safari — Chrome on iOS doesn&apos;t support this</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">2</span>
-                    <div>
-                      <p className="text-sm font-medium">Tap the Share button</p>
-                      <p className="text-xs text-muted-foreground">
-                        <span className="inline-block px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium">⬆️</span>
-                        Square icon with arrow pointing up at the bottom
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">3</span>
-                    <div>
-                      <p className="text-sm font-medium">Scroll down, tap &quot;Add to Home Screen&quot;</p>
-                      <p className="text-xs text-muted-foreground">You can rename it to something discreet</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">✓</span>
-                    <div>
-                      <p className="text-sm font-medium">GNECT is on your home screen!</p>
-                      <p className="text-xs text-muted-foreground">Works like a native app with no Safari bars</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
+          {/* ========== iOS INSTRUCTIONS — ALWAYS SHOW ========== */}
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold flex items-center gap-2">
+              <Apple className="w-5 h-5 text-foreground" />
+              iPhone / iPad
+            </h3>
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+              <ol className="space-y-3">
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">1</span>
+                  <div>
+                    <p className="text-sm font-medium">Open GNECT in Safari</p>
+                    <p className="text-xs text-muted-foreground">Must use Safari — Chrome on iOS doesn&apos;t support this</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">2</span>
+                  <div>
+                    <p className="text-sm font-medium">Tap the Share button</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="inline-block px-1.5 py-0.5 rounded bg-secondary text-[10px] font-medium">⬆️</span>
+                      {' '}Square icon with arrow pointing up at the bottom
+                    </p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">3</span>
+                  <div>
+                    <p className="text-sm font-medium">Scroll down, tap &quot;Add to Home Screen&quot;</p>
+                    <p className="text-xs text-muted-foreground">You can rename it to something discreet</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">✓</span>
+                  <div>
+                    <p className="text-sm font-medium">GNECT is on your home screen!</p>
+                    <p className="text-xs text-muted-foreground">Works like a native app with no Safari bars</p>
+                  </div>
+                </li>
+              </ol>
             </div>
-          )}
+          </div>
 
-          {/* Desktop Instructions */}
-          {platform === 'desktop' && !canInstall && !isInstalled && (
-            <div className="space-y-3">
-              <h3 className="text-base font-semibold flex items-center gap-2">
-                <Monitor className="w-5 h-5 text-muted-foreground" />
-                Desktop (Chrome/Edge)
-              </h3>
-              <div className="bg-card border border-border rounded-2xl p-4">
-                <ol className="space-y-3">
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">1</span>
-                    <div>
-                      <p className="text-sm font-medium">Look for the install icon in the address bar</p>
-                      <p className="text-xs text-muted-foreground">Or click Menu → &quot;Install GNECT&quot;</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">✓</span>
-                    <div>
-                      <p className="text-sm font-medium">GNECT opens in its own window</p>
-                      <p className="text-xs text-muted-foreground">Like a desktop app, no browser UI</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
+          {/* ========== DESKTOP INSTRUCTIONS — ALWAYS SHOW ========== */}
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold flex items-center gap-2">
+              <Monitor className="w-5 h-5 text-muted-foreground" />
+              Desktop (Chrome / Edge)
+            </h3>
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <ol className="space-y-3">
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">1</span>
+                  <div>
+                    <p className="text-sm font-medium">Look for the install icon in the address bar</p>
+                    <p className="text-xs text-muted-foreground">Or click Menu → &quot;Install GNECT&quot;</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">✓</span>
+                  <div>
+                    <p className="text-sm font-medium">GNECT opens in its own window</p>
+                    <p className="text-xs text-muted-foreground">Like a desktop app, no browser UI</p>
+                  </div>
+                </li>
+              </ol>
             </div>
-          )}
+          </div>
 
           {/* Privacy tip */}
           <div className="p-3 rounded-xl bg-muted/50 border border-border">

@@ -45,10 +45,16 @@ export default function RootLayout({
         {/* PWA manifest */}
         <link rel="manifest" href="/manifest.json" />
 
+        {/* PWA icons — iOS + standard */}
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+
         {/* PWA meta tags — iOS standalone mode support */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="GNECT" />
+        <meta name="theme-color" content="#1a1a2e" />
 
         {/* Preconnect to external services for instant connections */}
         {process.env.NEXT_PUBLIC_SOCKET_URL && (

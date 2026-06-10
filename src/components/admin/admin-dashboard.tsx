@@ -75,10 +75,10 @@ export function AdminDashboard() {
       </div>
 
       {/* 7-day user growth chart */}
-      <div className="bg-card border border-border rounded-xl p-4">
+      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold">7-Day Signups</span>
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <span className="text-sm font-semibold text-zinc-100">7-Day Signups</span>
         </div>
         {data.userGrowth.length > 0 ? (
           <GrowthChart data={data.userGrowth} />
@@ -88,8 +88,8 @@ export function AdminDashboard() {
       </div>
 
       {/* Top 5 regions */}
-      <div className="bg-card border border-border rounded-xl p-4">
-        <span className="text-sm font-semibold mb-3 block">Top 5 Regions</span>
+      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
+        <span className="text-sm font-semibold mb-3 block text-zinc-100">Top 5 Regions</span>
         {data.regionBreakdown.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-2">No data</p>
         ) : (
@@ -97,17 +97,18 @@ export function AdminDashboard() {
             {data.regionBreakdown.map((r, i) => {
               const maxCount = data.regionBreakdown[0]?.count || 1
               const pct = Math.max(10, (r.count / maxCount) * 100)
+              const barColors = ['bg-emerald-400', 'bg-emerald-500', 'bg-teal-400', 'bg-green-400', 'bg-lime-400']
               return (
                 <div key={r.region} className="flex items-center gap-2">
                   <span className="text-sm shrink-0">{r.countryFlag}</span>
-                  <span className="text-xs text-muted-foreground w-24 truncate shrink-0">{r.region}</span>
-                  <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                  <span className="text-xs text-zinc-300 w-24 truncate shrink-0 font-medium">{r.region}</span>
+                  <div className="flex-1 h-6 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
                     <div
-                      className="h-full bg-primary rounded-full transition-all"
+                      className={`h-full ${barColors[i % barColors.length]} rounded-full transition-all`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-xs font-medium text-foreground w-10 text-right">{r.count}</span>
+                  <span className="text-xs font-bold text-emerald-400 w-10 text-right">{r.count}</span>
                 </div>
               )
             })}
@@ -116,29 +117,30 @@ export function AdminDashboard() {
       </div>
 
       {/* Top 5 countries */}
-      <div className="bg-card border border-border rounded-xl p-4">
+      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Globe className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold">Top 5 Countries</span>
+          <Globe className="w-4 h-4 text-emerald-400" />
+          <span className="text-sm font-semibold text-zinc-100">Top 5 Countries</span>
         </div>
         {data.countryBreakdown.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-2">No data</p>
         ) : (
           <div className="space-y-2">
-            {data.countryBreakdown.map((c) => {
+            {data.countryBreakdown.map((c, ci) => {
               const maxCount = data.countryBreakdown[0]?.count || 1
               const pct = Math.max(10, (c.count / maxCount) * 100)
+              const barColors = ['bg-emerald-400', 'bg-emerald-500', 'bg-teal-400', 'bg-green-400', 'bg-lime-400']
               return (
                 <div key={c.country} className="flex items-center gap-2">
                   <span className="text-sm shrink-0">{c.flag}</span>
-                  <span className="text-xs text-muted-foreground w-24 truncate shrink-0">{c.country}</span>
-                  <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                  <span className="text-xs text-zinc-300 w-24 truncate shrink-0 font-medium">{c.country}</span>
+                  <div className="flex-1 h-6 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
                     <div
-                      className="h-full bg-primary rounded-full transition-all"
+                      className={`h-full ${barColors[ci % barColors.length]} rounded-full transition-all`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-xs font-medium text-foreground w-10 text-right">{c.count}</span>
+                  <span className="text-xs font-bold text-emerald-400 w-10 text-right">{c.count}</span>
                 </div>
               )
             })}
@@ -147,17 +149,17 @@ export function AdminDashboard() {
       </div>
 
       {/* Quick summary */}
-      <div className="bg-card border border-border rounded-xl p-4">
-        <span className="text-sm font-semibold mb-2 block">Quick Summary</span>
+      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
+        <span className="text-sm font-semibold mb-2 block text-zinc-100">Quick Summary</span>
         <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-xs">
-          <span className="text-muted-foreground">Total Messages</span>
-          <span className="font-medium text-foreground text-right">{data.content.totalMessages.toLocaleString()}</span>
-          <span className="text-muted-foreground">New Feedback</span>
-          <span className="font-medium text-foreground text-right">{data.feedback.newCount}</span>
-          <span className="text-muted-foreground">User Reports</span>
-          <span className="font-medium text-foreground text-right">{data.reports.pendingUserReports}</span>
-          <span className="text-muted-foreground">Post Reports</span>
-          <span className="font-medium text-foreground text-right">{data.reports.pendingPostReports}</span>
+          <span className="text-zinc-400">Total Messages</span>
+          <span className="font-bold text-zinc-100 text-right">{data.content.totalMessages.toLocaleString()}</span>
+          <span className="text-zinc-400">New Feedback</span>
+          <span className="font-bold text-emerald-400 text-right">{data.feedback.newCount}</span>
+          <span className="text-zinc-400">User Reports</span>
+          <span className="font-bold text-amber-400 text-right">{data.reports.pendingUserReports}</span>
+          <span className="text-zinc-400">Post Reports</span>
+          <span className="font-bold text-amber-400 text-right">{data.reports.pendingPostReports}</span>
         </div>
       </div>
     </div>
@@ -174,16 +176,16 @@ function StatCard({ icon, label, value, accent, danger }: {
   return (
     <div className={`rounded-xl p-3 border ${
       danger 
-        ? 'bg-destructive/5 border-destructive/30' 
+        ? 'bg-red-950/50 border-red-500/40' 
         : accent 
-          ? 'bg-primary/5 border-primary/20' 
-          : 'bg-card border-border'
+          ? 'bg-emerald-950/50 border-emerald-500/40' 
+          : 'bg-zinc-900/80 border-zinc-700/60'
     }`}>
       <div className="flex items-center gap-1.5 mb-1">
-        <span className={accent ? 'text-primary' : danger ? 'text-destructive' : 'text-muted-foreground'}>{icon}</span>
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
+        <span className={accent ? 'text-emerald-400' : danger ? 'text-red-400' : 'text-zinc-400'}>{icon}</span>
+        <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-medium">{label}</span>
       </div>
-      <p className={`text-xl font-bold ${accent ? 'text-primary' : danger ? 'text-destructive' : 'text-foreground'}`}>
+      <p className={`text-xl font-bold ${accent ? 'text-emerald-400' : danger ? 'text-red-400' : 'text-zinc-100'}`}>
         {value.toLocaleString()}
       </p>
     </div>

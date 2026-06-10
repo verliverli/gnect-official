@@ -335,8 +335,8 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
               )}
             </div>
 
-            {/* Name */}
-            <h3 className="text-xl font-bold truncate max-w-full">{user?.nickname}</h3>
+            {/* Name — no truncation, full name visible */}
+            <h3 className="text-xl font-bold whitespace-nowrap">{user?.nickname}</h3>
 
             {/* Badges row */}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap justify-center">
