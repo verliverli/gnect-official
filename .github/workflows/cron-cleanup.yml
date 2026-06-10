@@ -15,9 +15,14 @@ jobs:
     steps:
       - name: Trigger GNECT Cleanup
         run: |
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://gnect.vercel.app/api/cron/cleanup")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Response: $BODY"
 
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
             echo "✅ Cleanup triggered successfully (HTTP $HTTP_STATUS)"
@@ -25,10 +30,3 @@ jobs:
             echo "❌ Cleanup failed (HTTP $HTTP_STATUS)"
             exit 1
           fi
-
-      - name: Trigger GNECT Cleanup (with response body)
-        run: |
-          RESPONSE=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://gnect.vercel.app/api/cron/cleanup")
-          echo "Response: $RESPONSE"

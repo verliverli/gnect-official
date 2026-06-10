@@ -1,7 +1,7 @@
 // ============================================
 // GNECT GEO & VPN DETECTION
 // Registration security — country verification + VPN blocking
-// findip.net (primary) → Vercel header (fast) → proxycheck.io (backup)
+// Vercel header (fast) → findip.net (primary) → proxycheck.io (backup)
 // ============================================
 
 import { NextRequest } from "next/server"
@@ -97,13 +97,14 @@ function getClientIP(request: NextRequest): string {
  * Flow:
  * 1. Try Vercel header (instant)
  * 2. If no Vercel header, try findip.net (primary)
- * 3. If findip.net fails, try proxycheck.io (backup, also gives country)
+ * 3. If findip.net fails, try proxycheck.io (backup, also gives VPN status)
  * 4. If all fail, BLOCK registration (hard block — no fail-open)
  * 5. If country is not in target list, BLOCK
- * 6. Check VPN via proxycheck.io — if VPN detected, BLOCK
+ * 6. Check VPN via proxycheck.io (only if not already checked in step 3)
  */
 export async function checkGeoAndVPN(request: NextRequest): Promise<GeoCheckResult> {
   const ip = getClientIP(request)
+  let vpnAlreadyChecked = false
 
   // Step 1: Try Vercel header first (instant, zero API call)
   let countryCode: string | null = getVercelCountry(request)
@@ -113,16 +114,17 @@ export async function checkGeoAndVPN(request: NextRequest): Promise<GeoCheckResu
     countryCode = await getFindIpCountry(ip)
   }
 
-  // Step 3: If findip.net also failed, try proxycheck.io as backup (also returns country)
+  // Step 3: If findip.net also failed, try proxycheck.io as backup (also returns VPN status)
   if (!countryCode) {
     const proxyResult = await getProxyCheckResult(ip)
     countryCode = proxyResult.countryCode
+    vpnAlreadyChecked = true
 
     // Even if we got country from proxycheck, also check VPN status
     if (countryCode && proxyResult.isVPN) {
       return {
         allowed: false,
-        country: TARGET_COUNTRIES[countryCode] || null,
+        country: TARGET_COUNTRIES[countryCode] || countryCode,
         countryCode,
         isVPN: true,
         reason: "VPN/Proxy detected. Please turn off your VPN during registration.",
@@ -145,29 +147,31 @@ export async function checkGeoAndVPN(request: NextRequest): Promise<GeoCheckResu
   if (!TARGET_COUNTRIES[countryCode]) {
     return {
       allowed: false,
-      country: TARGET_COUNTRIES[countryCode] || null,
+      country: countryCode, // Show the raw country code so user knows what was detected
       countryCode,
       isVPN: false,
       reason: "Sorry, GNECT is not available in your country for now.",
     }
   }
 
-  // Step 6: Check VPN — only if we haven't already checked via proxycheck
-  const vpnCheck = await getProxyCheckResult(ip)
-  if (vpnCheck.isVPN) {
-    return {
-      allowed: false,
-      country: TARGET_COUNTRIES[countryCode] || null,
-      countryCode,
-      isVPN: true,
-      reason: "VPN/Proxy detected. Please turn off your VPN during registration.",
+  // Step 6: Check VPN — only if we haven't already checked via proxycheck in step 3
+  if (!vpnAlreadyChecked) {
+    const vpnCheck = await getProxyCheckResult(ip)
+    if (vpnCheck.isVPN) {
+      return {
+        allowed: false,
+        country: TARGET_COUNTRIES[countryCode] || countryCode,
+        countryCode,
+        isVPN: true,
+        reason: "VPN/Proxy detected. Please turn off your VPN during registration.",
+      }
     }
   }
 
   // All checks passed
   return {
     allowed: true,
-    country: TARGET_COUNTRIES[countryCode] || null,
+    country: TARGET_COUNTRIES[countryCode] || countryCode,
     countryCode,
     isVPN: false,
   }
