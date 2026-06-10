@@ -191,3 +191,37 @@ Stage Summary:
 - Commit: 34e956e "feat: APK download infrastructure for PWA Builder"
 - Download API: https://gnect.vercel.app/api/download
 - Download info: https://gnect.vercel.app/downloads/download-info.json
+
+---
+## Session: 2025-07-20 (Admin Stats Fix + PWA Manifest Fix + Profile Name + Install Guide)
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix admin stats visibility, PWA manifest for PWA Builder, profile name truncation, install guide updates
+
+Work Log:
+- Admin dashboard: replaced invisible bg-primary/bg-muted/text-foreground with explicit emerald/zinc colors
+  - StatCard: zinc-900 bg, zinc-100 numbers, emerald-400 accent, red-400 danger
+  - Region/country bars: emerald-400/500/teal-400 gradient bars, zinc-800 track, emerald-400 count
+  - Quick summary: zinc-400 labels, zinc-100/emerald-400/amber-400 values
+  - Growth chart card: zinc-900 bg, emerald-400 icon
+- Profile name: removed `truncate` class, added `whitespace-nowrap` — name shows fully
+- Nickname limit: changed from 20 to 10 chars in constants.ts, register-form.tsx
+- PWA manifest.json: complete rewrite with id, display_override, screenshots, shortcuts, launch_handler, share_target, prefer_related_applications, proper icons (192+512)
+- PWA icons: converted icon-512.png from JPEG 1024x1024 → proper PNG 512x512, created icon-192.png (192x192 PNG)
+- PWA screenshots: created screenshot-narrow.png (390x844), screenshot-wide.png (1280x720)
+- Service worker: upgraded to v2 with background sync (IndexedDB queue), cache-first for static assets, network-first for navigation, notification actions
+- Install guide: rewritten with ALL platform instructions always visible, app features section (Chat, Confessions, Mixer), benefits banner
+- Layout.tsx: added apple-touch-icon, favicon links, theme-color meta tag
+- Lint: clean (1 warning on CF worker script — pre-existing)
+- Pushed to GitHub, Vercel deployed and verified
+
+Stage Summary:
+- Admin stats now use EXPLICIT colors — emerald-400 bars, zinc-100 numbers — no more invisible stats
+- Profile name shows fully without truncation, max 10 chars
+- PWA manifest passes all PWA Builder checks: proper icons (192+512 PNG), id, screenshots, shortcuts
+- Service worker supports offline + background sync + notification actions
+- Install guide shows ALL platform instructions + app features
+- Commit: 4913103 "fix: admin stats visibility, PWA manifest, profile name, install guide"
+- Verified on Vercel: manifest.json has id+shortcuts, icon-512 is real PNG 512x512, icon-192 exists
