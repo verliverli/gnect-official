@@ -162,3 +162,32 @@ Stage Summary:
 - Commit: 7b309ef "feat: PWA one-click install + CF Worker root route fix"
 - Live at https://gnect.vercel.app
 - CF Worker at https://gnect-media.03mrfrancis.workers.dev
+
+---
+## Session: 2025-07-19 (APK Download Infrastructure)
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Set up APK download infrastructure for PWA Builder generated APK
+
+Work Log:
+- Created /public/downloads/ directory for hosting the APK file
+- Created download-info.json with version, size, changelog metadata
+- Created /api/download endpoint: checks if APK exists, returns availability + metadata
+- Updated install-guide.tsx: green "Download Android App" card with APK button for Android users
+- Updated install-app-button.tsx: smart priority — APK > one-click > manual guide
+- APK download flow: Android users see green "Download APK" button first, then browser install as fallback
+- Verified: /api/download returns `{"ok":true,"available":false}` (correct — no APK yet)
+- Verified: /downloads/download-info.json is accessible
+- Pushed to GitHub, Vercel deployed
+
+Stage Summary:
+- APK download infrastructure is READY
+- When APK is generated via PWA Builder:
+  1. Place gnect.apk in /public/downloads/
+  2. Update download-info.json with size + version
+  3. Push to GitHub — buttons auto-enable
+- Commit: 34e956e "feat: APK download infrastructure for PWA Builder"
+- Download API: https://gnect.vercel.app/api/download
+- Download info: https://gnect.vercel.app/downloads/download-info.json
