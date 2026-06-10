@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "GNECT",
-  description: "Private. Anonymous. Yours. — Gulf & Poland",
+  description: "Private. Anonymous. Yours. — Tanzania & Kenya",
   icons: {
     icon: [
       { url: "/logo.svg", type: "image/svg+xml" },
@@ -42,6 +42,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        {/* PWA manifest */}
+        <link rel="manifest" href="/manifest.json" />
+
+        {/* PWA meta tags — iOS standalone mode support */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="GNECT" />
+
         {/* Preconnect to external services for instant connections */}
         {process.env.NEXT_PUBLIC_SOCKET_URL && (
           <>
@@ -49,8 +57,6 @@ export default function RootLayout({
             <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SOCKET_URL} />
           </>
         )}
-        {/* Telegram Mini App SDK */}
-        <script src="https://telegram.org/js/telegram-web-app.js" async />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
@@ -66,6 +72,13 @@ export default function RootLayout({
             },
           }}
         />
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+              navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+          }
+        ` }} />
       </body>
     </html>
   )

@@ -63,7 +63,7 @@ const SECTIONS: {
     id: 'access',
     icon: <Smartphone className="w-5 h-5" />,
     title: 'Access Guide',
-    subtitle: 'Telegram Mini App, incognito, bookmarks',
+    subtitle: 'Install as PWA, incognito, bookmarks',
     color: 'text-yellow-500 bg-yellow-500/10',
   },
 ]
@@ -286,7 +286,6 @@ function PrivacySafetyGuide() {
 
       <h4 className="font-semibold text-foreground flex items-center gap-1.5"><EyeOff className="w-4 h-4" /> Disguise & Stealth</h4>
       <ul className="space-y-2 text-muted-foreground">
-        <li><strong className="text-foreground">Telegram Mini App:</strong> Access via @GNECT_app_bot — no app icon on your home screen at all.</li>
         <li><strong className="text-foreground">Discreet Notifications:</strong> Choose disguised styles — Weather, News, Delivery updates.</li>
         <li><strong className="text-foreground">Disappear Mode:</strong> Hides chat content in the chat list (shows &quot;Tap to view&quot;).</li>
         <li><strong className="text-foreground">Not Today:</strong> Hide your profile from Discover for 24 hours.</li>
@@ -367,22 +366,28 @@ function AccessGuide() {
       <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
         <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1"><Lock className="w-3 h-3" /> Privacy First</p>
         <p className="text-xs text-muted-foreground">
-          GNECT is designed for maximum privacy. Access via Telegram Mini App for the safest experience — no browsing history, no downloads, fully private.
+          GNECT is a Progressive Web App (PWA). Install it on your phone for the best experience — works like a native app with no browser history.
         </p>
       </div>
 
-      <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Smartphone className="w-4 h-4" /> Telegram Mini App (Recommended)</h4>
-      <div className="space-y-2 text-muted-foreground">
-        <p>The safest way to use GNECT. No browser history, no downloads, instant access.</p>
-        <ol className="list-decimal list-inside space-y-1 pl-2">
-          <li>Open <strong className="text-foreground">Telegram</strong></li>
-          <li>Search for <strong className="text-foreground">@GNECT_app_bot</strong></li>
-          <li>Tap <strong className="text-foreground">Start</strong> or the menu button</li>
-          <li>GNECT opens inside Telegram — fully private, no history saved</li>
-          <li>Your session stays active as long as you&apos;re in the Mini App</li>
-        </ol>
-        <p className="text-xs text-muted-foreground/60 mt-1 flex items-center gap-1"><Lock className="w-3 h-3" /> No downloads. No app store. No traces on your phone.</p>
-      </div>
+      <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Smartphone className="w-4 h-4" /> Install as App (Recommended)</h4>
+      <p className="text-muted-foreground">The best way to use GNECT. Works like a native app, no app store needed.</p>
+
+      <p className="mt-2"><strong className="text-foreground">Android (Chrome):</strong></p>
+      <ol className="list-decimal list-inside space-y-1 pl-2">
+        <li>Open GNECT in Chrome</li>
+        <li>Tap the 3-dot menu (⋮)</li>
+        <li>Tap <strong>"Add to Home Screen"</strong> or <strong>"Install app"</strong></li>
+        <li>GNECT appears on your home screen like a native app</li>
+      </ol>
+
+      <p className="mt-2"><strong className="text-foreground">iPhone (Safari):</strong></p>
+      <ol className="list-decimal list-inside space-y-1 pl-2">
+        <li>Open GNECT in Safari</li>
+        <li>Tap the Share button (⬆️)</li>
+        <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+        <li>GNECT appears on your home screen</li>
+      </ol>
 
       <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Globe className="w-4 h-4" /> Using Incognito Mode</h4>
       <div className="space-y-2 text-muted-foreground">
@@ -414,7 +419,7 @@ function AccessGuide() {
 
       <h4 className="font-semibold text-foreground flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Safety Tips</h4>
       <ul className="space-y-2 text-muted-foreground">
-        <li><strong className="text-foreground">Use Telegram Mini App</strong> — safest, no traces left on your phone.</li>
+        <li><strong className="text-foreground">Install as PWA</strong> — safest, works like a native app with no browser history.</li>
         <li><strong className="text-foreground">Or use Incognito</strong> — don&apos;t leave GNECT in your normal browser tabs.</li>
         <li><strong className="text-foreground">Set a Safe Page</strong> — configure your panic redirect in Profile → Privacy.</li>
         <li><strong className="text-foreground">Use Discreet Notifications</strong> — so push alerts don&apos;t reveal the app.</li>

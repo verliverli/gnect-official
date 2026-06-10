@@ -3,71 +3,29 @@
 // All preset lists, enums, and configuration
 // ============================================
 
-// Multi-Country Support — Gulf Region + Poland
+// Multi-Country Support — Tanzania & Kenya
 export const COUNTRIES = {
-  "Poland": {
-    flag: "🇵🇱",
+  "Tanzania": {
+    flag: "🇹🇿",
     regions: [
-      "Warszawa",
-      "Dolnośląskie",
-      "Kujawsko-pomorskie",
-      "Lubelskie",
-      "Lubuskie",
-      "Łódzkie",
-      "Małopolskie",
-      "Mazowieckie",
-      "Opolskie",
-      "Podkarpackie",
-      "Podlaskie",
-      "Pomorskie",
-      "Śląskie",
-      "Świętokrzyskie",
-      "Warmińsko-mazurskie",
-      "Wielkopolskie",
-      "Zachodniopomorskie",
+      "Arusha", "Dar es Salaam", "Dodoma", "Geita", "Iringa", "Kagera", "Katavi",
+      "Kigoma", "Kilimanjaro", "Lindi", "Manyara", "Mara", "Mbeya", "Morogoro",
+      "Mtwara", "Mwanza", "Njombe", "Pemba Kaskazini", "Pemba Kusini", "Pwani",
+      "Rukwa", "Ruvuma", "Shinyanga", "Simiyu", "Singida", "Songwe", "Tabora",
+      "Tanga", "Unguja Kaskazini", "Unguja Kusini", "Unguja Mjini Magharibi",
     ],
   },
-  "Qatar": {
-    flag: "🇶🇦",
+  "Kenya": {
+    flag: "🇰🇪",
     regions: [
-      "Ad Dawhah (Doha)",
-      "Al Daayen",
-      "Al Khor",
-      "Al Wakrah",
-      "Al Rayyan",
-      "Al Shamal",
-      "Umm Salal",
-      "Shahaniya",
-    ],
-  },
-  "Saudi Arabia": {
-    flag: "🇸🇦",
-    regions: [
-      "Riyadh",
-      "Makkah",
-      "Medina",
-      "Eastern Province (Ash Sharqiyah)",
-      "Al-Qassim",
-      "Hail",
-      "Tabuk",
-      "Al-Jawf",
-      "Northern Borders",
-      "Jazan",
-      "Asir",
-      "Al-Bahah",
-      "Najran",
-    ],
-  },
-  "UAE": {
-    flag: "🇦🇪",
-    regions: [
-      "Abu Dhabi",
-      "Dubai",
-      "Sharjah",
-      "Ajman",
-      "Umm Al-Quwain",
-      "Ras Al-Khaimah",
-      "Fujairah",
+      "Mombasa", "Kwale", "Kilifi", "Tana River", "Lamu", "Taita-Taveta",
+      "Garissa", "Wajir", "Mandera", "Marsabit", "Isiolo", "Meru",
+      "Tharaka-Nithi", "Embu", "Kitui", "Machakos", "Makueni", "Nyandarua",
+      "Nyeri", "Kirinyaga", "Murang'a", "Kiambu", "Turkana", "West Pokot",
+      "Samburu", "Trans-Nzoia", "Uasin Gishu", "Elgeyo-Marakwet", "Nandi",
+      "Baringo", "Laikipia", "Nakuru", "Narok", "Kajiado", "Kericho", "Bomet",
+      "Kakamega", "Vihiga", "Bungoma", "Busia", "Siaya", "Kisumu", "Homa Bay",
+      "Migori", "Kisii", "Nyamira", "Nairobi",
     ],
   },
 } as const
@@ -241,12 +199,15 @@ export const NICKNAME_RULES = {
 // Catbox API — Legacy, kept for backward compatibility with existing URLs
 // New uploads go through Telegram Bot API (see TELEGRAM_MEDIA below)
 
-// Direct Telegram Bot API — Gulf users have direct Telegram access
-// No Cloudflare Worker proxy needed
+// Cloudflare Worker proxy URL — bypasses Telegram API blocks in TZ & KE
+// Direct Telegram API is blocked in Tanzania and Kenya
+const CF_WORKER_URL = process.env.CF_MEDIA_WORKER_URL || "https://gnect-media.03mrfrancis.workers.dev"
+
 export const TELEGRAM_MEDIA = {
   BOT_TOKEN: process.env.GNECT_MEDIA_BOT_TOKEN || "",
   CHANNEL_ID: process.env.GNECT_MEDIA_CHANNEL_ID || "",
-  API_BASE: "https://api.telegram.org",
+  API_BASE: CF_WORKER_URL, // Proxied through Cloudflare Worker
+  DIRECT_API_BASE: "https://api.telegram.org", // Fallback for server-side (not blocked)
 } as const
 
 // Media URL helper — handles old Catbox URLs, Cloudflare Worker URLs, and Telegram file_ids
@@ -320,14 +281,8 @@ const BROADCAST_LEVELS = {
   INFO: "info",
 } as const
 
-// Country-specific Telegram Support Channels
-// Users only see the channel for their own country
-export const SUPPORT_CHANNELS: Record<string, string> = {
-  "Poland": "https://t.me/+sxJsVO4bbRgyMDM0",
-  "Qatar": "https://t.me/+eCrN4x-SgPZjOGNk",
-  "Saudi Arabia": "https://t.me/+OdXuH9HNYBM2OWZk",
-  "UAE": "https://t.me/+zgNczNN3-IE2ZGQ0",
-}
+// Support channels — no Telegram groups anymore
+export const SUPPORT_CHANNELS: Record<string, string> = {}
 
 // Default notification settings
 export const DEFAULT_NOTIFICATION_SETTINGS = {

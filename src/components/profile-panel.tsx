@@ -1,6 +1,6 @@
 'use client'
 
-import { X, Shield, Crown, Star, ChevronRight, LogOut, Camera, Eye, EyeOff, Trash2, Loader2, Clock, Zap, HelpCircle, FileText, BookOpen, Settings, Pencil, MessageCircle, Dumbbell, Tag, MapPin, AlertTriangle, Bell, CloudSun, Newspaper, Package, User } from 'lucide-react'
+import { X, Shield, Crown, Star, ChevronRight, LogOut, Camera, Eye, EyeOff, Trash2, Loader2, Clock, Zap, HelpCircle, FileText, BookOpen, Settings, Pencil, MessageCircle, Dumbbell, Tag, MapPin, AlertTriangle, Bell, CloudSun, Newspaper, Package, User, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useAuthStore } from '@/lib/store'
@@ -22,6 +22,7 @@ import { PrivacyPolicy } from '@/components/legal/privacy-policy'
 import { DeleteAccount } from '@/components/account-deletion'
 import { SupportScreen } from '@/components/support/support-screen'
 import { GeometricAvatar } from '@/components/geometric-avatar'
+import { InstallGuide } from '@/components/install-guide'
 
 interface ProfilePanelProps {
   onClose: () => void
@@ -46,6 +47,7 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
+  const [showInstallGuide, setShowInstallGuide] = useState(false)
   const [bio, setBio] = useState(user?.bio ?? '')
   const [heightVal, setHeightVal] = useState(user?.height?.toString() ?? '')
   const [weightVal, setWeightVal] = useState(user?.weight?.toString() ?? '')
@@ -870,6 +872,15 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
             </div>
           </SectionCard>
 
+          {/* Install App */}
+          <button onClick={() => setShowInstallGuide(true)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors">
+            <Download className="w-5 h-5 text-primary" />
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium">Install App</p>
+              <p className="text-[10px] text-muted-foreground">Add to home screen for the best experience</p>
+            </div>
+          </button>
+
           {/* BOSS MODE — Admin Panel — only for admins */}
           {isAdmin && (
             <div className="space-y-2">
@@ -1008,6 +1019,11 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
       {/* Support Screen overlay */}
       <AnimatePresence>
         {showSupport && <SupportScreen onClose={() => setShowSupport(false)} />}
+      </AnimatePresence>
+
+      {/* Install Guide overlay */}
+      <AnimatePresence>
+        {showInstallGuide && <InstallGuide onClose={() => setShowInstallGuide(false)} />}
       </AnimatePresence>
     </motion.div>
   )

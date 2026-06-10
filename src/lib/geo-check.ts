@@ -9,10 +9,8 @@ import { NextRequest } from "next/server"
 // Target countries — ONLY these are allowed for registration
 // Maps ISO country code → display name
 const TARGET_COUNTRIES: Record<string, string> = {
-  PL: "Poland",
-  QA: "Qatar",
-  AE: "UAE",
-  SA: "Saudi Arabia",
+  TZ: "Tanzania",
+  KE: "Kenya",
 }
 
 export interface GeoCheckResult {

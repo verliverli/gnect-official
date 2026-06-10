@@ -253,7 +253,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="overflow-hidden border-b border-border bg-card shrink-0"
+            className="overflow-hidden border-b border-border bg-card/80 backdrop-blur-sm shrink-0"
           >
             <div className="px-4 py-3 space-y-3">
               <h3 className="text-sm font-semibold text-primary">Notification Settings</h3>
@@ -389,11 +389,11 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
                 onClick={() => { if (!notif.is_read) markRead(notif.id) }}
                 className={`px-4 py-3 flex gap-3 cursor-pointer active:bg-card/50 transition-colors ${
                   !notif.is_read ? 'bg-primary/5' : ''
-                }`}
+                } backdrop-blur-sm`}
               >
                 {/* Icon */}
                 <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-                  !notif.is_read ? 'bg-primary/10' : 'bg-secondary'
+                  !notif.is_read ? 'bg-primary/10 backdrop-blur-sm border border-primary/20' : 'bg-secondary'
                 }`}>
                   <NotificationIcon type={notif.type} />
                 </div>

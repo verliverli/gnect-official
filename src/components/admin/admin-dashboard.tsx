@@ -107,7 +107,7 @@ export function AdminDashboard() {
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-xs font-medium w-10 text-right">{r.count}</span>
+                  <span className="text-xs font-medium text-foreground w-10 text-right">{r.count}</span>
                 </div>
               )
             })}
@@ -138,7 +138,7 @@ export function AdminDashboard() {
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-xs font-medium w-10 text-right">{c.count}</span>
+                  <span className="text-xs font-medium text-foreground w-10 text-right">{c.count}</span>
                 </div>
               )
             })}
@@ -151,13 +151,13 @@ export function AdminDashboard() {
         <span className="text-sm font-semibold mb-2 block">Quick Summary</span>
         <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-xs">
           <span className="text-muted-foreground">Total Messages</span>
-          <span className="font-medium text-right">{data.content.totalMessages.toLocaleString()}</span>
+          <span className="font-medium text-foreground text-right">{data.content.totalMessages.toLocaleString()}</span>
           <span className="text-muted-foreground">New Feedback</span>
-          <span className="font-medium text-right">{data.feedback.newCount}</span>
+          <span className="font-medium text-foreground text-right">{data.feedback.newCount}</span>
           <span className="text-muted-foreground">User Reports</span>
-          <span className="font-medium text-right">{data.reports.pendingUserReports}</span>
+          <span className="font-medium text-foreground text-right">{data.reports.pendingUserReports}</span>
           <span className="text-muted-foreground">Post Reports</span>
-          <span className="font-medium text-right">{data.reports.pendingPostReports}</span>
+          <span className="font-medium text-foreground text-right">{data.reports.pendingPostReports}</span>
         </div>
       </div>
     </div>
@@ -172,12 +172,18 @@ function StatCard({ icon, label, value, accent, danger }: {
   danger?: boolean
 }) {
   return (
-    <div className={`bg-card border rounded-xl p-3 ${danger ? 'border-destructive/30' : 'border-border'}`}>
+    <div className={`rounded-xl p-3 border ${
+      danger 
+        ? 'bg-destructive/5 border-destructive/30' 
+        : accent 
+          ? 'bg-primary/5 border-primary/20' 
+          : 'bg-card border-border'
+    }`}>
       <div className="flex items-center gap-1.5 mb-1">
         <span className={accent ? 'text-primary' : danger ? 'text-destructive' : 'text-muted-foreground'}>{icon}</span>
         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
       </div>
-      <p className={`text-xl font-bold ${accent ? 'text-primary' : danger ? 'text-destructive' : ''}`}>
+      <p className={`text-xl font-bold ${accent ? 'text-primary' : danger ? 'text-destructive' : 'text-foreground'}`}>
         {value.toLocaleString()}
       </p>
     </div>

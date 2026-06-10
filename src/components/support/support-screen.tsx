@@ -7,11 +7,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Send, MessageCircle, Plus, Loader2, Clock, Shield, Lightbulb, Lock, Bug, Check, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Send, MessageCircle, Plus, Loader2, Clock, Shield, Lightbulb, Lock, Bug, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/lib/store'
-import { SUPPORT_CHANNELS, getCountryFlag } from '@/lib/constants'
+// SUPPORT_CHANNELS and getCountryFlag removed — no longer needed
 
 interface SupportScreenProps {
   onClose: () => void
@@ -46,8 +46,6 @@ type View = 'list' | 'detail' | 'new'
 
 export function SupportScreen({ onClose }: SupportScreenProps) {
   const { user: currentUser } = useAuthStore()
-  const userCountry = currentUser?.country || ''
-  const countryChannel = userCountry ? SUPPORT_CHANNELS[userCountry] : null
 
   const [view, setView] = useState<View>('list')
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -272,29 +270,35 @@ export function SupportScreen({ onClose }: SupportScreenProps) {
             transition={{ duration: 0.15 }}
             className="flex-1 overflow-y-auto overscroll-contain gnect-scroll"
           >
-            {/* Country-specific Telegram channel */}
-            {countryChannel && (
-              <div className="mx-4 mt-3 mb-2 rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-base">
-                  {getCountryFlag(userCountry)}
+            {/* FAQ Section */}
+            <details className="mx-4 mt-3 mb-2 rounded-xl border border-border bg-card">
+              <summary className="p-3 cursor-pointer text-sm font-medium flex items-center gap-2 hover:bg-card/80 transition-colors">
+                <Lightbulb className="w-4 h-4 text-primary" />
+                Frequently Asked Questions
+              </summary>
+              <div className="px-3 pb-3 space-y-3 text-xs text-muted-foreground">
+                <div>
+                  <p className="font-medium text-foreground">How do I change my region?</p>
+                  <p>Go to Profile → Edit Profile. Region can be changed once every 60 days.</p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground">
-                    {getCountryFlag(userCountry)} {userCountry} Support
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">Get help with account issues, bugs & more</p>
+                <div>
+                  <p className="font-medium text-foreground">How do I delete my account?</p>
+                  <p>Go to Profile → Account → Delete Account. You have 30 days to recover.</p>
                 </div>
-                <a
-                  href={countryChannel}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold flex items-center gap-1 hover:bg-primary/90 transition-colors"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  Join
-                </a>
+                <div>
+                  <p className="font-medium text-foreground">Is GNECT free?</p>
+                  <p>Yes! All features are currently free during the test period.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">How do I install GNECT as an app?</p>
+                  <p>Tap the Install App button in your Profile or go to Help → Access Guide.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Why is my VPN blocked?</p>
+                  <p>GNECT requires you to turn off VPN during registration for security. You can use VPN after registering.</p>
+                </div>
               </div>
-            )}
+            </details>
 
             {loading ? (
               <div className="flex justify-center py-16">

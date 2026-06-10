@@ -1,10 +1,3 @@
-// Service Worker route handler — serves /sw.js for PWA + Push Notifications
-// Using a route handler avoids the Next.js dev server crash that occurs
-// when sw.js exists as a static file in public/
-
-import { NextResponse } from 'next/server'
-
-const SW_CODE = `
 // GNECT Service Worker — PWA + Push Notifications
 const CACHE_NAME = 'gnect-v1';
 const STATIC_ASSETS = [
@@ -99,14 +92,3 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
-`
-
-export async function GET() {
-  return new NextResponse(SW_CODE, {
-    headers: {
-      'Content-Type': 'application/javascript',
-      'Cache-Control': 'public, max-age=3600',
-      'Service-Worker-Allowed': '/',
-    },
-  })
-}

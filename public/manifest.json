@@ -1,0 +1,26 @@
+{
+  "name": "GNECT",
+  "short_name": "GNECT",
+  "description": "Private. Anonymous. Yours. — Tanzania & Kenya",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["social", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}
