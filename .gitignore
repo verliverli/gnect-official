@@ -23,8 +23,6 @@ node_modules
 # misc
 .DS_Store
 *.pem
-package-lock.json
-scripts/db-cleanup.ts
 
 # debug
 npm-debug.log*
@@ -38,6 +36,7 @@ yarn-error.log*
 # vercel
 .vercel
 
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -49,47 +48,7 @@ dev.log
 dev.out.log
 test
 prompt
+
 server.log
-
-# ============================================
-# SANDBOX FILES — NEVER push these to any repo
-# These are development/sandbox environment files
-# ============================================
-
-# Sandbox scripts and config
-.zscripts/
-Caddyfile
-keep-alive.sh
-run-server.sh
-SESSION_SAVE.md
-
-# Sandbox directories
-download/
-examples/
-skills/
-mini-services/
-zscript/
-
-# Database files (local only)
-db/*.db
-prisma/*.db
-*.db-journal
-*.db-wal
-
-# Session and temp files
-*.session
-*.tmp
-start-dev.sh
-start-server.sh
-
-# Screenshots, images, and agent context
-# Block all images at root level — public/ icons are exempt via negation
-/*.png
-/*.jpg
-/*.jpeg
-/*.gif
-/*.webp
-!public/
-agent-ctx/
-worklog.md
-test-results/
+# Skills directory
+/skills/
