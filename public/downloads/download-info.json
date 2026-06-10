@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "versionCode": 1,
+  "filename": "gnect.apk",
+  "size": null,
+  "sha256": null,
+  "generatedAt": null,
+  "minAndroidVersion": "8.0",
+  "changelog": "Initial PWA Builder APK"
+}

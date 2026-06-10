@@ -1,11 +1,19 @@
 'use client'
 
-import { X, Smartphone, Download, Apple, Monitor, Bell, Wifi, Shield, Check, Loader2 } from 'lucide-react'
+import { X, Smartphone, Download, Apple, Monitor, Bell, Wifi, Shield, Check, Loader2, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import { usePwaInstall } from '@/lib/use-pwa-install'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+interface DownloadInfo {
+  available: boolean
+  version: string
+  size: number | null
+  downloadUrl: string | null
+  changelog: string | null
+}
 
 interface InstallGuideProps {
   onClose: () => void
@@ -23,11 +31,51 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
     return 'desktop'
   })
 
+  // Check if APK download is available
+  const [apkInfo, setApkInfo] = useState<DownloadInfo | null>(null)
+  const [apkChecking, setApkChecking] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/download')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          setApkInfo({
+            available: d.available,
+            version: d.version,
+            size: d.size,
+            downloadUrl: d.downloadUrl,
+            changelog: d.changelog,
+          })
+        }
+      })
+      .catch(() => {})
+      .finally(() => setApkChecking(false))
+  }, [])
+
   const handleInstall = async () => {
     const accepted = await promptInstall()
     if (accepted) {
       toast.success('GNECT installed!', { description: 'Find it on your home screen' })
     }
+  }
+
+  const handleDownloadApk = () => {
+    if (apkInfo?.downloadUrl) {
+      // Track download event
+      try {
+        fetch('/api/download', { method: 'POST', credentials: 'same-origin' }).catch(() => {})
+      } catch {}
+      // Trigger download
+      window.open(apkInfo.downloadUrl, '_blank')
+      toast.success('Download started!', { description: 'Open the APK file to install' })
+    }
+  }
+
+  const formatSize = (bytes: number | null) => {
+    if (!bytes) return ''
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   return (
@@ -55,6 +103,38 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto overscroll-contain gnect-scroll">
         <div className="px-4 py-4 space-y-5">
+
+          {/* APK DOWNLOAD — for Android users, the fastest way */}
+          {platform === 'android' && apkInfo?.available && !isInstalled && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-5 rounded-2xl bg-gradient-to-br from-green-500/20 via-green-500/5 to-transparent border border-green-500/30"
+            >
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-500/20 mb-3">
+                  <Package className="w-8 h-8 text-green-500" />
+                </div>
+                <h3 className="text-lg font-bold">Download Android App</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Install directly — no Play Store needed
+                  {apkInfo.version && <span className="ml-1">· v{apkInfo.version}</span>}
+                  {apkInfo.size && <span className="ml-1">· {formatSize(apkInfo.size)}</span>}
+                </p>
+              </div>
+              <Button
+                onClick={handleDownloadApk}
+                className="w-full h-12 text-base font-bold rounded-xl gnect-press bg-green-600 hover:bg-green-700 text-white"
+                size="lg"
+              >
+                <Package className="w-5 h-5 mr-2" />
+                Download APK
+              </Button>
+              <p className="text-[10px] text-muted-foreground text-center mt-2">
+                After download, open the APK file and tap &quot;Install&quot;
+              </p>
+            </motion.div>
+          )}
 
           {/* ONE-CLICK INSTALL — shown when browser supports it */}
           {canInstall && !isInstalled && (
@@ -126,8 +206,8 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
             </div>
           </div>
 
-          {/* Android Instructions — show if can't auto-install OR on Android */}
-          {(platform === 'android' || !canInstall) && !isInstalled && (
+          {/* Android Instructions — show if APK not available AND can't auto-install */}
+          {platform === 'android' && !apkInfo?.available && !canInstall && !isInstalled && (
             <div className="space-y-3">
               <h3 className="text-base font-semibold flex items-center gap-2">
                 <Smartphone className="w-5 h-5 text-green-500" />
@@ -169,7 +249,7 @@ export function InstallGuide({ onClose }: InstallGuideProps) {
           )}
 
           {/* iOS Instructions */}
-          {(platform === 'ios' || !canInstall) && !isInstalled && (
+          {platform === 'ios' && !isInstalled && (
             <div className="space-y-3">
               <h3 className="text-base font-semibold flex items-center gap-2">
                 <Apple className="w-5 h-5 text-foreground" />

@@ -1,8 +1,9 @@
 'use client'
 
-import { Download, Check, Loader2 } from 'lucide-react'
+import { Download, Check, Loader2, Package } from 'lucide-react'
 import { usePwaInstall } from '@/lib/use-pwa-install'
 import { toast } from 'sonner'
+import { useState, useEffect } from 'react'
 
 interface InstallAppButtonProps {
   onOpenGuide: () => void
@@ -10,12 +11,32 @@ interface InstallAppButtonProps {
 
 /**
  * Smart install button:
+ * - If APK available on Android → Download APK
  * - If browser supports beforeinstallprompt → one-click install
  * - If already installed → shows "Installed" state
  * - Otherwise → opens the install guide with manual instructions
  */
 export function InstallAppButton({ onOpenGuide }: InstallAppButtonProps) {
   const { canInstall, isInstalled, promptInstall, isLoading } = usePwaInstall()
+
+  // Check if APK download is available
+  const [apkAvailable, setApkAvailable] = useState(false)
+  const [apkUrl, setApkUrl] = useState<string | null>(null)
+
+  // Detect platform
+  const isAndroid = typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent)
+
+  useEffect(() => {
+    fetch('/api/download')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && d.available && d.downloadUrl) {
+          setApkAvailable(true)
+          setApkUrl(d.downloadUrl)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Already installed — show success state
   if (isInstalled) {
@@ -27,6 +48,25 @@ export function InstallAppButton({ onOpenGuide }: InstallAppButtonProps) {
           <p className="text-[10px] text-muted-foreground">GNECT is on your home screen</p>
         </div>
       </div>
+    )
+  }
+
+  // Android + APK available → direct download
+  if (isAndroid && apkAvailable && apkUrl) {
+    return (
+      <button
+        onClick={() => {
+          window.open(apkUrl, '_blank')
+          toast.success('Download started!', { description: 'Open the APK file to install' })
+        }}
+        className="w-full flex items-center gap-3 p-3 rounded-xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 transition-colors active:scale-[0.98]"
+      >
+        <Package className="w-5 h-5 text-green-500" />
+        <div className="flex-1 text-left">
+          <p className="text-sm font-semibold text-green-500">Download Android App</p>
+          <p className="text-[10px] text-muted-foreground">Install directly — no Play Store needed</p>
+        </div>
+      </button>
     )
   }
 
