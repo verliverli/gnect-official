@@ -23,6 +23,8 @@ node_modules
 # misc
 .DS_Store
 *.pem
+package-lock.json
+scripts/db-cleanup.ts
 
 # debug
 npm-debug.log*
