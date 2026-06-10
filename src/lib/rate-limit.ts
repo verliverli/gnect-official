@@ -103,28 +103,3 @@ export function recordLoginAttempt(nickname: string): void {
 export function clearLoginAttempts(nickname: string): void {
   loginAttempts.delete(nickname)
 }
-
-// Clean up expired entries (call periodically)
-export function cleanupExpiredEntries(): void {
-  const now = Date.now()
-  for (const [key, entry] of loginAttempts.entries()) {
-    if (now - entry.windowStart > LOGIN_WINDOW_MS) {
-      loginAttempts.delete(key)
-    }
-  }
-}
-
-// Clean up expired rate limit entries (older than 1 hour)
-export async function cleanupRateLimits(): Promise<void> {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-
-  await db.rateLimit.deleteMany({
-    where: { hour_window_start: { lt: oneHourAgo } },
-  })
-
-  // Also clean up old IP registration records (older than 24h)
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-  await db.iPRegistration.deleteMany({
-    where: { registered_at: { lt: twentyFourHoursAgo } },
-  })
-}

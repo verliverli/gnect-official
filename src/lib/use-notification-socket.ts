@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from './store'
 
@@ -33,7 +33,7 @@ export function useNotificationSocket(onNewNotification?: (notif: NotificationDa
   useEffect(() => {
     if (!user) return
 
-    // Socket.io server URL — Bug 15: use env var only, no hardcoded fallback
+    // Socket.io server URL — use env var only, no hardcoded fallback
     const envSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL
     if (!envSocketUrl) {
       console.warn('NEXT_PUBLIC_SOCKET_URL is not set — notification socket disabled')
@@ -68,11 +68,6 @@ export function useNotificationSocket(onNewNotification?: (notif: NotificationDa
 
     // Listen for real-time notifications
     socket.on('notification', (data: NotificationData) => {
-
-      // Play discreet notification sound
-      playNotificationSound()
-
-      // Callback to update UI
       if (onNotifRef.current) {
         onNotifRef.current(data)
       }
@@ -80,10 +75,6 @@ export function useNotificationSocket(onNewNotification?: (notif: NotificationDa
 
     // Listen for admin broadcasts
     socket.on('broadcast', (data: NotificationData) => {
-
-      // Play broadcast sound (slightly different)
-      playBroadcastSound()
-
       if (onNotifRef.current) {
         onNotifRef.current(data)
       }
@@ -98,27 +89,4 @@ export function useNotificationSocket(onNewNotification?: (notif: NotificationDa
   }, [user])
 
   return socketRef
-}
-
-// ============================================
-// Discreet Notification Sounds (Web Audio API)
-// Very subtle — user barely notices, but
-// gets a subconscious "something happened" cue
-// ============================================
-
-let sharedAudioCtx: AudioContext | null = null
-
-function getAudioContext(): AudioContext {
-  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-    sharedAudioCtx = new AudioContext()
-  }
-  return sharedAudioCtx
-}
-
-function playNotificationSound() {
-  // Sound disabled — no audio playback
-}
-
-function playBroadcastSound() {
-  // Sound disabled — no audio playback
 }

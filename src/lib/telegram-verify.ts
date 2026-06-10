@@ -76,8 +76,9 @@ export function verifyTelegramInitData(initData: string, botToken: string): bool
 /**
  * Extract user info from Telegram initData
  * Returns parsed user object or null if invalid
+ * Kept for future use — may be needed for auto-filling registration fields
  */
-export function extractTelegramUser(initData: string): {
+function extractTelegramUser(initData: string): {
   id: number
   first_name: string
   username?: string

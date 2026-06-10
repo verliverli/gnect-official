@@ -238,11 +238,8 @@ export const NICKNAME_RULES = {
 // ADMIN_NICKNAME and ADMIN_PASSWORD must be set in .env
 // Never hardcode credentials in source code.
 
-// Catbox API
-export const CATBOX_API = {
-  UPLOAD_URL: "https://catbox.moe/user/api.php",
-  DELETE_URL: "https://catbox.moe/user/api.php",
-} as const
+// Catbox API — Legacy, kept for backward compatibility with existing URLs
+// New uploads go through Telegram Bot API (see TELEGRAM_MEDIA below)
 
 // Direct Telegram Bot API — Gulf users have direct Telegram access
 // No Cloudflare Worker proxy needed
@@ -298,15 +295,16 @@ export const STATUS_DURATIONS = [
 // Users are free to say anything — only links are blocked
 // ============================================
 
-export const LINK_PATTERN = /https?:\/\/|www\.[a-z0-9-]+\.[a-z]{2,}|[a-z0-9-]+\.(com|net|org|tz|io|co|me|info|xyz|app|dev|cc|tv|ly|gl|bit|tiny|shorty|rebrand|smarturl|click|link|url|page|site|web|online|shop|store|buzz|zone|space|live|world|life|club|fun|top|one|mobi|pro|tech|design|studio|agency)\b/i
+// Link pattern — internal use only, use containsLink() externally
+const LINK_PATTERN = /https?:\/\/|www\.[a-z0-9-]+\.[a-z]{2,}|[a-z0-9-]+\.(com|net|org|tz|io|co|me|info|xyz|app|dev|cc|tv|ly|gl|bit|tiny|shorty|rebrand|smarturl|click|link|url|page|site|web|online|shop|store|buzz|zone|space|live|world|life|club|fun|top|one|mobi|pro|tech|design|studio|agency)\b/i
 
 export function containsLink(text: string | null | undefined): boolean {
   if (!text) return false
   return LINK_PATTERN.test(text)
 }
 
-// Notification types
-export const NOTIFICATION_TYPES = {
+// Notification types — internal use only
+const NOTIFICATION_TYPES = {
   MESSAGE: "message",
   COMMUNITY: "community",
   PROFILE_VIEW: "profile_view",
@@ -316,8 +314,8 @@ export const NOTIFICATION_TYPES = {
   ADMIN_EVENT: "admin_event",
 } as const
 
-// Broadcast levels
-export const BROADCAST_LEVELS = {
+// Broadcast levels — internal use only
+const BROADCAST_LEVELS = {
   URGENT: "urgent",
   INFO: "info",
 } as const

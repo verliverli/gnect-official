@@ -7,8 +7,6 @@ import {
   NICKNAME_RULES,
   RATE_LIMITS,
   ROLES,
-  BODY_TYPES,
-  INTO_TAGS,
 } from "./constants"
 
 // Validate nickname format
@@ -55,15 +53,12 @@ export function validateAge(age: number): { valid: boolean; error?: string } {
 }
 
 // Validate region
-// Region validation is now a basic non-empty string check.
-// The real validation (region must belong to the selected country) happens on the frontend dropdown.
 export function validateRegion(region: string): boolean {
   if (!region || typeof region !== "string") return false
   return region.trim().length > 0
 }
 
 // Validate country
-// Basic non-empty string check — the real country list is enforced by the frontend dropdown.
 export function validateCountry(country: string): boolean {
   if (!country || typeof country !== "string") return false
   return country.trim().length > 0
@@ -72,27 +67,6 @@ export function validateCountry(country: string): boolean {
 // Validate role
 export function validateRole(role: string): boolean {
   return (ROLES as readonly string[]).includes(role)
-}
-
-// Validate body type
-export function validateBodyType(bodyType: string): boolean {
-  return (BODY_TYPES as readonly string[]).includes(bodyType)
-}
-
-// Validate into tags (max 5, must be from preset list)
-export function validateIntoTags(
-  tags: string[]
-): { valid: boolean; error?: string } {
-  if (tags.length > 5) {
-    return { valid: false, error: "Maximum 5 tags allowed" }
-  }
-  const tagSet = new Set(INTO_TAGS as readonly string[])
-  for (const tag of tags) {
-    if (!tagSet.has(tag)) {
-      return { valid: false, error: `Invalid tag: ${tag}` }
-    }
-  }
-  return { valid: true }
 }
 
 // Enhanced bot pattern detection (unified — used by both register and check-nickname)
@@ -118,22 +92,4 @@ export function isBotNickname(nickname: string): boolean {
     if (half + half === nickname) return true
   }
   return false
-}
-
-// Validate bio (max 300 chars)
-export function validateBio(bio: string): { valid: boolean; error?: string } {
-  if (bio.length > 300) {
-    return { valid: false, error: "Bio must be 300 characters or less" }
-  }
-  return { valid: true }
-}
-
-// Honeypot check — if hidden field has a value, it's a bot
-export function isHoneypotTriggered(honeypotValue: string | undefined): boolean {
-  return !!honeypotValue && honeypotValue.length > 0
-}
-
-// Timing check — reject if form submitted too fast (bot indicator)
-export function isTimingTooFast(startTime: number): boolean {
-  return Date.now() - startTime < RATE_LIMITS.MIN_REGISTER_TIME_MS
 }

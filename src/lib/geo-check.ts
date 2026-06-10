@@ -7,15 +7,8 @@
 import { NextRequest } from "next/server"
 
 // Target countries — ONLY these are allowed for registration
+// Maps ISO country code → display name
 const TARGET_COUNTRIES: Record<string, string> = {
-  PL: "Poland",
-  QA: "Qatar",
-  AE: "UAE",
-  SA: "Saudi Arabia",
-}
-
-// Country code to country name mapping (for error messages)
-const COUNTRY_CODE_TO_NAME: Record<string, string> = {
   PL: "Poland",
   QA: "Qatar",
   AE: "UAE",
@@ -129,7 +122,7 @@ export async function checkGeoAndVPN(request: NextRequest): Promise<GeoCheckResu
     if (countryCode && proxyResult.isVPN) {
       return {
         allowed: false,
-        country: COUNTRY_CODE_TO_NAME[countryCode] || null,
+        country: TARGET_COUNTRIES[countryCode] || null,
         countryCode,
         isVPN: true,
         reason: "VPN/Proxy detected. Please turn off your VPN during registration.",
@@ -152,7 +145,7 @@ export async function checkGeoAndVPN(request: NextRequest): Promise<GeoCheckResu
   if (!TARGET_COUNTRIES[countryCode]) {
     return {
       allowed: false,
-      country: COUNTRY_CODE_TO_NAME[countryCode] || null,
+      country: TARGET_COUNTRIES[countryCode] || null,
       countryCode,
       isVPN: false,
       reason: "Sorry, GNECT is not available in your country for now.",
@@ -164,7 +157,7 @@ export async function checkGeoAndVPN(request: NextRequest): Promise<GeoCheckResu
   if (vpnCheck.isVPN) {
     return {
       allowed: false,
-      country: COUNTRY_CODE_TO_NAME[countryCode] || null,
+      country: TARGET_COUNTRIES[countryCode] || null,
       countryCode,
       isVPN: true,
       reason: "VPN/Proxy detected. Please turn off your VPN during registration.",
@@ -174,7 +167,7 @@ export async function checkGeoAndVPN(request: NextRequest): Promise<GeoCheckResu
   // All checks passed
   return {
     allowed: true,
-    country: COUNTRY_CODE_TO_NAME[countryCode] || null,
+    country: TARGET_COUNTRIES[countryCode] || null,
     countryCode,
     isVPN: false,
   }

@@ -3,9 +3,9 @@ import { getCurrentUser } from '@/lib/auth'
 import { db } from '@/lib/db'
 
 // GET /api/cron/cleanup — Cleanup expired data
-// Called periodically by external cron (cron-job.org) or manually by admin
+// Called periodically by GitHub Actions cron or manually by admin
 // Supports two auth methods:
-//   1. CRON_SECRET via Authorization header or ?secret= query param (for automated cron jobs)
+//   1. CRON_SECRET via Authorization header or ?secret= query param
 //   2. Admin user session (for manual triggers)
 export async function GET(request?: NextRequest) {
   try {
@@ -23,170 +23,129 @@ export async function GET(request?: NextRequest) {
     }
 
     const now = new Date()
+    const results: Record<string, number> = {}
 
-    // ===== 0. Stale online cleanup — mark users offline if last_seen > 5 min ago =====
+    // ===== 1. Stale online cleanup — mark users offline if last_seen > 5 min ago =====
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
     const staleOnlineUsers = await db.user.updateMany({
-      where: {
-        is_online: true,
-        last_seen: { lt: fiveMinutesAgo },
-      },
-      data: {
-        is_online: false,
-        in_app_at: null, // Also clear in_app_at for stale users
-      },
+      where: { is_online: true, last_seen: { lt: fiveMinutesAgo } },
+      data: { is_online: false, in_app_at: null },
     })
+    results.staleOnlineCleaned = staleOnlineUsers.count
 
-    // ===== 0.5. Clear stale in_app_at for users who are offline but still have in_app_at =====
+    // ===== 2. Clear stale in_app_at for offline users =====
     const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000)
     const staleInAppUsers = await db.user.updateMany({
-      where: {
-        in_app_at: { not: null, lt: twoMinutesAgo },
-      },
-      data: {
-        in_app_at: null,
-      },
+      where: { in_app_at: { not: null, lt: twoMinutesAgo } },
+      data: { in_app_at: null },
     })
+    results.staleInAppCleaned = staleInAppUsers.count
 
-    // ===== 1. Clear expired statuses =====
-    // Find users with expired status and clear them
+    // ===== 3. Clear expired statuses =====
     const usersWithExpiredStatus = await db.user.findMany({
-      where: {
-        status_expires_at: { lt: now },
-        NOT: { status_text: null },
-      },
+      where: { status_expires_at: { lt: now }, NOT: { status_text: null } },
       select: { id: true },
     })
-    let expiredStatuses = 0
     if (usersWithExpiredStatus.length > 0) {
       const result = await db.user.updateMany({
-        where: {
-          id: { in: usersWithExpiredStatus.map(u => u.id) },
-        },
-        data: {
-          status_text: null,
-          status_gradient: null,
-          status_expires_at: null,
-          status_views: 0,
-        },
+        where: { id: { in: usersWithExpiredStatus.map(u => u.id) } },
+        data: { status_text: null, status_gradient: null, status_expires_at: null, status_views: 0 },
       })
-      expiredStatuses = result.count
+      results.expiredStatuses = result.count
+    } else {
+      results.expiredStatuses = 0
     }
 
-    // ===== 2. Delete expired messages (auto_delete_at) =====
-    // This handles: unopened media (30 min), opened media (24h), view-once after timer
+    // ===== 4. Delete expired messages (auto_delete_at) =====
     const expiredAutoDelete = await db.message.deleteMany({
-      where: {
-        NOT: { auto_delete_at: null },
-        auto_delete_at: { lt: now },
-      },
+      where: { NOT: { auto_delete_at: null }, auto_delete_at: { lt: now } },
     })
+    results.expiredAutoDeleteMessages = expiredAutoDelete.count
 
-    // ===== 3. Delete expired messages (hard_delete_at) =====
-    // This is the 7-day hard limit — catches everything including text
+    // ===== 5. Delete expired messages (hard_delete_at — 7-day hard limit) =====
     const expiredHardDelete = await db.message.deleteMany({
-      where: {
-        NOT: { hard_delete_at: null },
-        hard_delete_at: { lt: now },
-      },
+      where: { NOT: { hard_delete_at: null }, hard_delete_at: { lt: now } },
     })
+    results.expiredHardDeleteMessages = expiredHardDelete.count
 
-    // ===== 4. Delete old notifications (older than 30 days) =====
+    // ===== 6. Delete old notifications (older than 30 days) =====
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const deletedNotifications = await db.notification.deleteMany({
       where: { created_at: { lt: thirtyDaysAgo } },
     })
+    results.deletedNotifications = deletedNotifications.count
 
-    // ===== 5. Delete expired admin broadcasts =====
+    // ===== 7. Delete expired admin broadcasts =====
     const expiredBroadcasts = await db.adminBroadcast.deleteMany({
-      where: {
-        NOT: { expires_at: null },
-        expires_at: { lt: now },
-      },
+      where: { NOT: { expires_at: null }, expires_at: { lt: now } },
     })
+    results.expiredBroadcasts = expiredBroadcasts.count
 
-    // ===== 6. Delete expired community posts + comments (7-day auto-delete) =====
-    // auto_delete_at is required (non-nullable) on these models, so no null check needed
+    // ===== 8. Delete expired community posts + comments (7-day auto-delete) =====
     const expiredPosts = await db.communityPost.deleteMany({
-      where: {
-        auto_delete_at: { lt: now },
-        is_deleted: false,
-      },
+      where: { auto_delete_at: { lt: now }, is_deleted: false },
     })
-
     const expiredComments = await db.postComment.deleteMany({
-      where: {
-        auto_delete_at: { lt: now },
-        is_deleted: false,
-      },
+      where: { auto_delete_at: { lt: now }, is_deleted: false },
     })
+    results.expiredPosts = expiredPosts.count
+    results.expiredComments = expiredComments.count
 
-    // ===== 7. Delete expired group messages (7-day auto-delete) =====
-    // Group messages auto-delete after 7 days (hard_delete_at is non-nullable on GroupMessage)
+    // ===== 9. Delete expired group messages (7-day auto-delete) =====
     const expiredGroupMessages = await db.groupMessage.deleteMany({
-      where: {
-        hard_delete_at: { lt: now },
-      },
+      where: { hard_delete_at: { lt: now } },
     })
+    results.expiredGroupMessages = expiredGroupMessages.count
 
-    // ===== 7.5. Clean expired confessions (7-day auto-delete) =====
+    // ===== 10. Clean expired confessions (7-day auto-delete) =====
     const expiredConfessions = await db.confession.deleteMany({
-      where: {
-        auto_delete_at: { lte: now },
-      },
+      where: { auto_delete_at: { lte: now } },
     })
-    if (expiredConfessions.count > 0) {
-      console.log(`[CRON] Deleted ${expiredConfessions.count} expired confessions`)
-    }
+    results.expiredConfessions = expiredConfessions.count
 
-    // ===== 8. Clean up expired rate limits =====
+    // ===== 11. Clean up expired rate limits =====
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
     const expiredRateLimits = await db.rateLimit.deleteMany({
       where: { hour_window_start: { lt: oneHourAgo } },
     })
+    results.expiredRateLimits = expiredRateLimits.count
 
-    // ===== 9. Reset not_today for expired users =====
+    // ===== 12. Clean up old IP registrations (older than 24h) =====
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const expiredIPRegistrations = await db.iPRegistration.deleteMany({
+      where: { registered_at: { lt: twentyFourHoursAgo } },
+    })
+    results.expiredIPRegistrations = expiredIPRegistrations.count
+
+    // ===== 13. Reset not_today for expired users =====
     const usersWithExpiredNotToday = await db.user.findMany({
-      where: {
-        not_today: true,
-        NOT: { not_today_expires: null },
-        not_today_expires: { lt: now },
-      },
+      where: { not_today: true, NOT: { not_today_expires: null }, not_today_expires: { lt: now } },
       select: { id: true },
     })
-    let resetNotToday = 0
     if (usersWithExpiredNotToday.length > 0) {
       const result = await db.user.updateMany({
-        where: {
-          id: { in: usersWithExpiredNotToday.map(u => u.id) },
-        },
-        data: {
-          not_today: false,
-          not_today_expires: null,
-        },
+        where: { id: { in: usersWithExpiredNotToday.map(u => u.id) } },
+        data: { not_today: false, not_today_expires: null },
       })
-      resetNotToday = result.count
+      results.resetNotToday = result.count
+    } else {
+      results.resetNotToday = 0
     }
 
-    // ===== 10. Send scheduled broadcasts that are due =====
+    // ===== 14. Send scheduled broadcasts that are due =====
     const CHAT_SERVICE_URL = process.env.CHAT_SERVICE_URL || ''
     const scheduledBroadcasts = await db.adminBroadcast.findMany({
-      where: {
-        is_sent: false,
-        scheduled_at: { not: null, lte: now },
-      },
+      where: { is_sent: false, scheduled_at: { not: null, lte: now } },
     })
 
     let sentBroadcasts = 0
     for (const broadcast of scheduledBroadcasts) {
       try {
-        // Mark as sent
         await db.adminBroadcast.update({
           where: { id: broadcast.id },
           data: { is_sent: true, sent_at: new Date() },
         })
 
-        // Create notification records for target users
         const targetUsers = await db.user.findMany({
           where: {
             is_banned: false,
@@ -214,7 +173,7 @@ export async function GET(request?: NextRequest) {
             })),
           })
 
-          // Emit real-time broadcast via Socket.io
+          // Emit real-time broadcast via Socket.io (fire-and-forget)
           const socketPayload = {
             id: broadcast.id,
             type: 'admin_broadcast',
@@ -228,16 +187,17 @@ export async function GET(request?: NextRequest) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ notification: socketPayload }),
-          }).catch(() => {}) // Fire-and-forget
+          }).catch(() => {})
         }
 
         sentBroadcasts++
       } catch (e) {
-        console.error(`Failed to send scheduled broadcast ${broadcast.id}:`, e)
+        console.error(`[CRON] Failed to send scheduled broadcast ${broadcast.id}:`, e)
       }
     }
+    results.sentScheduledBroadcasts = sentBroadcasts
 
-    // ===== 11. Phase 8: Permanently delete soft-deleted accounts past grace period =====
+    // ===== 15. Permanently delete soft-deleted accounts past grace period =====
     const softDeletedUsers = await db.user.findMany({
       where: {
         is_banned: true,
@@ -252,9 +212,12 @@ export async function GET(request?: NextRequest) {
       if (!deadlineStr) continue
       const deadline = new Date(deadlineStr)
       if (now > deadline) {
-        // Grace period expired — permanently delete
         try {
-          // Delete all related data
+          // Delete all related data in dependency order
+          await db.confessionReport.deleteMany({ where: { reporter_id: u.id } })
+          await db.confessionReaction.deleteMany({ where: { user_id: u.id } })
+          await db.confession.deleteMany({ where: { user_id: u.id } })
+          await db.hotTakeVote.deleteMany({ where: { user_id: u.id } })
           await db.postReport.deleteMany({ where: { reporter_id: u.id } })
           await db.postUpvote.deleteMany({ where: { user_id: u.id } })
           await db.postComment.deleteMany({ where: { user_id: u.id } })
@@ -271,11 +234,12 @@ export async function GET(request?: NextRequest) {
           await db.rateLimit.deleteMany({ where: { user_id: u.id } })
           await db.profilePhoto.deleteMany({ where: { user_id: u.id } })
           await db.intoTag.deleteMany({ where: { user_id: u.id } })
-          // Missing models from original — add Feedback, Support, Ratings
           await db.feedback.deleteMany({ where: { user_id: u.id } })
           await db.supportMessage.deleteMany({ where: { sender_id: u.id } })
           await db.supportConversation.deleteMany({ where: { user_id: u.id } })
           await db.userRating.deleteMany({ where: { OR: [{ rater_id: u.id }, { rated_user_id: u.id }] } })
+          await db.groupMember.deleteMany({ where: { user_id: u.id } })
+
           const userChats = await db.chat.findMany({
             where: { OR: [{ user1_id: u.id }, { user2_id: u.id }] },
             select: { id: true },
@@ -284,34 +248,19 @@ export async function GET(request?: NextRequest) {
             await db.message.deleteMany({ where: { chat_id: chat.id } })
             await db.chat.delete({ where: { id: chat.id } })
           }
+
           await db.user.delete({ where: { id: u.id } })
           permanentlyDeleted++
         } catch (e) {
-          console.error(`Failed to permanently delete user ${u.id}:`, e)
+          console.error(`[CRON] Failed to permanently delete user ${u.id}:`, e)
         }
       }
     }
+    results.permanentlyDeletedAccounts = permanentlyDeleted
 
-    return NextResponse.json({
-      ok: true,
-      staleOnlineCleaned: staleOnlineUsers.count,
-      staleInAppCleaned: staleInAppUsers.count,
-      expiredStatuses,
-      expiredAutoDeleteMessages: expiredAutoDelete.count,
-      expiredHardDeleteMessages: expiredHardDelete.count,
-      deletedNotifications: deletedNotifications.count,
-      expiredBroadcasts: expiredBroadcasts.count,
-      expiredPosts: expiredPosts.count,
-      expiredComments: expiredComments.count,
-      expiredGroupMessages: expiredGroupMessages.count,
-      expiredConfessions: expiredConfessions.count,
-      expiredRateLimits: expiredRateLimits.count,
-      resetNotToday,
-      sentScheduledBroadcasts: sentBroadcasts,
-      permanentlyDeletedAccounts: permanentlyDeleted,
-    })
+    return NextResponse.json({ ok: true, ...results })
   } catch (err) {
-    console.error('Cleanup error:', err)
+    console.error('[CRON] Cleanup error:', err)
     return NextResponse.json({ ok: false, error: 'Server error' }, { status: 500 })
   }
 }
