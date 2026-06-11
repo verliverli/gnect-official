@@ -3,8 +3,8 @@
   "versionCode": 1,
   "filename": "gnect.apk",
   "size": 2085437,
-  "sha256": null,
-  "generatedAt": "2025-03-05T00:00:00.000Z",
+  "sha256": "b3179bd224380d7144036a3ce99ad7b1f536e2dcfc41adf0bf95b2e8aab9cbac",
+  "generatedAt": "2026-06-11T02:06:00.000Z",
   "minAndroidVersion": "8.0",
   "changelog": "Initial PWA Builder APK"
 }
