@@ -43,3 +43,8 @@ export async function GET() {
     return NextResponse.json({ ok: false, available: false })
   }
 }
+
+// POST — track download click (no-op, just returns ok so the fetch doesn't 404)
+export async function POST() {
+  return NextResponse.json({ ok: true })
+}

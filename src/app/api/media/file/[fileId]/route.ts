@@ -6,7 +6,7 @@ import { createHash } from "crypto"
 // File paths never change for a given file_id, so we cache them forever
 // ============================================
 const filePathCache = new Map<string, string>()
-const FILE_PATH_CACHE_MAX = 1000
+const FILE_PATH_CACHE_MAX = 5000
 
 function cacheFilePath(fileId: string, filePath: string): void {
   // Evict oldest entry if at capacity
@@ -29,8 +29,8 @@ interface CachedResponse {
   timestamp: number
 }
 const responseCache = new Map<string, CachedResponse>()
-const RESPONSE_CACHE_MAX = 200
-const RESPONSE_CACHE_MAX_BYTES = 200 * 1024 // Only cache files <= 200KB
+const RESPONSE_CACHE_MAX = 500
+const RESPONSE_CACHE_MAX_BYTES = 500 * 1024 // Cache files up to 500KB for speed
 
 function cacheResponse(fileId: string, quality: string, data: Buffer, contentType: string, contentLength: number): void {
   if (data.length > RESPONSE_CACHE_MAX_BYTES) return // Don't cache large files
@@ -104,17 +104,35 @@ export async function GET(
     if (!filePath) {
       // Use CF Worker proxy for getFile to bypass TZ/KE blocks
       const cfWorkerUrl = process.env.CF_MEDIA_WORKER_URL || "https://gnect-media.03mrfrancis.workers.dev"
-      const getFileUrl = `${cfWorkerUrl}/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`
-      const fileRes = await fetch(getFileUrl, { signal: AbortSignal.timeout(10000) })
-
-      if (!fileRes.ok) {
-        console.error("Telegram getFile error:", fileRes.status)
-        return NextResponse.json({ ok: false, error: "Failed to get file info" }, { status: 502 })
+      
+      // Try CF Worker first, then direct Telegram API as fallback
+      const apiEndpoints = [
+        cfWorkerUrl,
+        "https://api.telegram.org",
+      ]
+      
+      let fileData: { ok: boolean; result?: { file_path?: string } } | null = null
+      
+      for (const apiBase of apiEndpoints) {
+        try {
+          const getFileUrl = `${apiBase}/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`
+          const fileRes = await fetch(getFileUrl, { signal: AbortSignal.timeout(10000) })
+          
+          if (!fileRes.ok) continue
+          
+          const data = await fileRes.json()
+          if (data.ok && data.result?.file_path) {
+            fileData = data
+            break
+          }
+        } catch {
+          // Try next endpoint
+          continue
+        }
       }
-
-      const fileData = await fileRes.json()
-      if (!fileData.ok || !fileData.result?.file_path) {
-        console.error("Telegram getFile unexpected response:", fileData)
+      
+      if (!fileData?.result?.file_path) {
+        console.error("Telegram getFile: all endpoints failed for fileId:", fileId.slice(0, 20))
         return NextResponse.json({ ok: false, error: "File not found" }, { status: 404 })
       }
 
@@ -148,19 +166,39 @@ export async function GET(
     }
 
     // Step 3: Fetch the actual file data from Telegram via CF Worker proxy
+    // Try CF Worker first, then direct API as fallback for reliability
     const cfWorkerUrl = process.env.CF_MEDIA_WORKER_URL || "https://gnect-media.03mrfrancis.workers.dev"
-    const directUrl = `${cfWorkerUrl}/file/bot${botToken}/${downloadPath}`
-
-    let mediaRes = await fetch(directUrl, { signal: AbortSignal.timeout(30000) })
-
-    // If thumbnail path failed (file might not have _s variant), fall back to original path
-    if (!mediaRes.ok && quality === "thumbnail" && downloadPath !== filePath) {
-      const fallbackUrl = `${cfWorkerUrl}/file/bot${botToken}/${filePath}`
-      mediaRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(30000) })
+    const mediaEndpoints = [cfWorkerUrl, "https://api.telegram.org"]
+    
+    let mediaRes: Response | null = null
+    
+    for (const apiBase of mediaEndpoints) {
+      try {
+        const directUrl = `${apiBase}/file/bot${botToken}/${downloadPath}`
+        const res = await fetch(directUrl, { signal: AbortSignal.timeout(15000) })
+        
+        if (res.ok) {
+          mediaRes = res
+          break
+        }
+        
+        // If thumbnail path failed, try original path
+        if (!res.ok && quality === "thumbnail" && downloadPath !== filePath) {
+          const fallbackUrl = `${apiBase}/file/bot${botToken}/${filePath}`
+          const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(15000) })
+          if (fallbackRes.ok) {
+            mediaRes = fallbackRes
+            break
+          }
+        }
+      } catch {
+        // Try next endpoint
+        continue
+      }
     }
 
-    if (!mediaRes.ok) {
-      console.error("Telegram file download error:", mediaRes.status)
+    if (!mediaRes) {
+      console.error("Telegram file download: all endpoints failed for fileId:", fileId.slice(0, 20))
       return NextResponse.json({ ok: false, error: "Failed to download file" }, { status: 502 })
     }
 

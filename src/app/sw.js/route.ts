@@ -6,17 +6,23 @@ import { NextResponse } from 'next/server'
 
 const SW_CODE = `
 // GNECT Service Worker — PWA + Push Notifications
-const CACHE_NAME = 'gnect-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/logo.svg',
-];
+// Robust: never blocks uploads, never fails on install, skips all API/media
+const CACHE_NAME = 'gnect-v2';
 
-// Install event — cache static assets
+// Install event — cache static assets, but DON'T fail if any are unavailable
 self.addEventListener('install', (event) => {
+  // Use addAll with fallback — if any asset fails, we still install
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then((cache) => {
+      // Cache each asset individually so one failure doesn't block the rest
+      return Promise.allSettled([
+        cache.add('/'),
+        cache.add('/manifest.json'),
+        cache.add('/logo.svg'),
+      ]);
+    }).catch(() => {
+      // Even if caching fails completely, install the SW
+    })
   );
   self.skipWaiting();
 });
@@ -32,24 +38,40 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch event — network first, cache fallback
+// CRITICAL: Skip ALL non-GET requests (uploads, etc.) and ALL API calls
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
+  // Skip non-GET requests — uploads use POST and must NEVER be intercepted
   if (event.request.method !== 'GET') return;
   
-  // Skip API calls — always fresh
+  // Skip API calls — always fresh, never cache
   if (event.request.url.includes('/api/')) return;
+
+  // Skip media proxy requests — these have their own caching via ETags
+  if (event.request.url.includes('/api/media/')) return;
+
+  // Skip chrome-extension and other non-http requests
+  if (!event.request.url.startsWith('http')) return;
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses
+        // Cache successful responses for offline use
         if (response.ok) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, clone).catch(() => {
+              // Cache write failure is non-critical — ignore
+            });
+          }).catch(() => {});
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => {
+        // Network failed — try cache
+        return caches.match(event.request).then((cached) => {
+          return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
+        });
+      })
   );
 });
 

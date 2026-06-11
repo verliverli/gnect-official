@@ -955,9 +955,6 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
             </div>
           </SectionCard>
 
-          {/* Install App — one-click when browser supports it, otherwise opens guide */}
-          <InstallAppButton onOpenGuide={() => setShowInstallGuide(true)} />
-
           {/* BOSS MODE — Admin Panel — only for admins */}
           {isAdmin && (
             <div className="space-y-2">
@@ -986,6 +983,9 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
             onToggle={() => toggleSection('account')}
           >
             <div className="space-y-4">
+              {/* Download / Install App */}
+              <InstallAppButton onOpenGuide={() => setShowInstallGuide(true)} />
+
               {/* Password recovery warning — always visible */}
               <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
                 <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
