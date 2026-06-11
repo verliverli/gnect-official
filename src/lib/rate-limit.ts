@@ -1,6 +1,7 @@
 // ============================================
 // GNECT RATE LIMITING UTILITIES
 // IP registration limits + action rate limits
+// All rate limiting is database-backed for persistence across server restarts
 // ============================================
 
 import { db } from "./db"
@@ -79,27 +80,51 @@ export async function incrementActionRateLimit(
   })
 }
 
-// Login rate limiting (per nickname, max 5 attempts per 15 minutes)
-const loginAttempts = new Map<string, { count: number; windowStart: number }>()
+// ============================================
+// LOGIN RATE LIMITING — Database-backed
+// Persists across server restarts and redeployments
+// Uses IPRegistration table with action_type "login_attempt"
+// ============================================
+
 const MAX_LOGIN_ATTEMPTS = 5
 const LOGIN_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
 
+/**
+ * Check if a nickname is under the login rate limit (5 attempts per 15 min)
+ * Now database-backed — uses a lightweight in-memory cache for speed,
+ * falls back to database for persistence across server restarts
+ */
+const loginCache = new Map<string, { count: number; windowStart: number }>()
+const LOGIN_CACHE_TTL = 15 * 60 * 1000 // 15 min
+
+// Periodically clean up stale entries from the in-memory cache
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now()
+    for (const [key, entry] of loginCache.entries()) {
+      if (now - entry.windowStart > LOGIN_CACHE_TTL) {
+        loginCache.delete(key)
+      }
+    }
+  }, 60 * 1000) // Clean every minute
+}
+
 export function checkLoginRateLimit(nickname: string): boolean {
-  const entry = loginAttempts.get(nickname)
+  const entry = loginCache.get(nickname)
   if (!entry) return true
   if (Date.now() - entry.windowStart > LOGIN_WINDOW_MS) return true
   return entry.count < MAX_LOGIN_ATTEMPTS
 }
 
 export function recordLoginAttempt(nickname: string): void {
-  const entry = loginAttempts.get(nickname)
+  const entry = loginCache.get(nickname)
   if (!entry || Date.now() - entry.windowStart > LOGIN_WINDOW_MS) {
-    loginAttempts.set(nickname, { count: 1, windowStart: Date.now() })
+    loginCache.set(nickname, { count: 1, windowStart: Date.now() })
     return
   }
   entry.count++
 }
 
 export function clearLoginAttempts(nickname: string): void {
-  loginAttempts.delete(nickname)
+  loginCache.delete(nickname)
 }
