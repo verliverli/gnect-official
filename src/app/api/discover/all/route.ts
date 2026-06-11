@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         rating_avg: true,
         rating_count: true,
         photos: {
-          select: { id: true, catbox_url: true, is_face_pic: true, is_locked: true },
+          select: { id: true, catbox_url: true, is_face_pic: true, is_locked: true, uploaded_at: true },
           orderBy: { upload_order: "asc" },
         },
         into_tags: {

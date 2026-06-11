@@ -33,6 +33,7 @@ import { useDataStore } from '@/lib/data-store'
 import { useAppCache, dedupFetch } from '@/lib/app-cache'
 import { QUICK_REPLIES, MEDIA_LIMITS, getMediaUrl, containsLink } from '@/lib/constants'
 import { toast } from 'sonner'
+import { compressImage, validateImageFile, uploadWithProgress, withRetry, isRetryableError, formatFileSize, type UploadProgress } from '@/lib/media-utils'
 import { io, Socket } from 'socket.io-client'
 import { ChatSelfDestruct } from '@/components/chat-self-destruct'
 import { PhotoViewer } from '@/components/photo-viewer'
@@ -608,6 +609,8 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'compressing' | 'uploading'>('idle')
   // viewOnceMode removed — ALL photos are privacy-first (view_once_photo) by default
 
   // Photo preview before send
@@ -1417,13 +1420,11 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
     const file = e.target.files?.[0]
     if (!file || !activeChatId) return
 
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Only JPEG, PNG, and WebP allowed')
-      return
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Photo must be under 2MB')
+    // Validate the file
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      toast.error(validation.error!)
+      if (photoInputRef.current) photoInputRef.current.value = ''
       return
     }
 
@@ -1436,23 +1437,53 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
     reader.readAsDataURL(file)
   }
 
-  // Confirm photo send — actually upload and send
+  // Confirm photo send — compress, upload, and send
   const handleConfirmPhotoSend = useCallback(async () => {
     if (!photoFile || !activeChatId) return
 
     setUploading(true)
     setPhotoPreview(null)
     try {
-      // Upload to Catbox
-      const formData = new FormData()
-      formData.append('photo', photoFile)
+      // Step 1: Compress the image
+      setUploadPhase('compressing')
+      setUploadProgress(null)
 
-      const uploadRes = await fetch(`/api/chat/${activeChatId}/upload-media`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'same-origin',
-      })
-      const uploadData = await uploadRes.json()
+      const originalSize = photoFile.size
+      const compressed = await compressImage(photoFile, 1024 * 1024, 1600) // Target 1MB, max width 1600px
+
+      // Log compression result for debugging
+      if (compressed.size < originalSize) {
+        console.log(`[Chat Upload] Compressed: ${formatFileSize(originalSize)} → ${formatFileSize(compressed.size)}`)
+      }
+
+      // Check if compressed size is still too large (2MB hard limit)
+      if (compressed.size > MEDIA_LIMITS.MAX_PHOTO_SIZE_BYTES) {
+        toast.error('Image too large even after compression — try a smaller image')
+        return
+      }
+
+      // Step 2: Upload with progress + retry
+      setUploadPhase('uploading')
+
+      const formData = new FormData()
+      const ext = compressed.type === 'image/webp' ? 'webp' : 'jpg'
+      formData.append('photo', compressed, `photo.${ext}`)
+
+      const uploadData = await withRetry(
+        () =>
+          uploadWithProgress<{ ok: boolean; error?: string; data?: { url: string } }>({
+            url: `/api/chat/${activeChatId}/upload-media`,
+            formData,
+            credentials: 'same-origin',
+            onProgress: setUploadProgress,
+            timeout: 60000,
+          }),
+        {
+          maxRetries: 2,
+          baseDelayMs: 1000,
+          shouldRetry: isRetryableError,
+        }
+      )
 
       if (!uploadData.ok) {
         toast.error(uploadData.error || 'Upload failed')
@@ -1529,14 +1560,21 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
       } else {
         toast.error(data.error || 'Failed to send photo')
       }
-    } catch {
-      toast.error('Network error')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      if (msg.includes('Network error') || msg.includes('fetch') || msg.includes('timed out')) {
+        toast.error('Network error — please check your connection and try again')
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setUploading(false)
+      setUploadPhase('idle')
+      setUploadProgress(null)
       setPhotoFile(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
     }
-  }, [photoFile, activeChatId, currentUser, replyTo])
+  }, [photoFile, activeChatId, currentUser, replyTo, activeChatUser])
 
   const handleCancelPhotoPreview = useCallback(() => {
     setPhotoPreview(null)
@@ -2398,11 +2436,18 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
         <button
           onClick={() => photoInputRef.current?.click()}
           disabled={uploading || isRecordingVoice}
-          className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 active:bg-secondary transition-colors gnect-press"
-          aria-label="Send privacy-first photo"
+          className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 active:bg-secondary transition-colors gnect-press relative"
+          aria-label={uploading ? (uploadPhase === 'compressing' ? 'Compressing...' : 'Uploading...') : 'Send privacy-first photo'}
         >
-          {uploading ? (
+          {uploading && uploadPhase === 'compressing' ? (
             <Loader2 className="w-5 h-5 text-primary animate-spin" />
+          ) : uploading ? (
+            <div className="relative flex items-center justify-center">
+              <Camera className="w-5 h-5 text-primary" />
+              {uploadProgress && (
+                <span className="absolute -bottom-3 text-[8px] text-primary font-medium">{uploadProgress.percent}%</span>
+              )}
+            </div>
           ) : (
             <Camera className="w-5 h-5 text-muted-foreground" />
           )}
@@ -2521,10 +2566,15 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
               Cancel
             </Button>
             <Button onClick={handleConfirmPhotoSend} className="rounded-xl" disabled={uploading}>
-              {uploading ? (
+              {uploading && uploadPhase === 'compressing' ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Sending...
+                  Compressing...
+                </>
+              ) : uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading{uploadProgress ? ` ${uploadProgress.percent}%` : '...'}
                 </>
               ) : (
                 <>
@@ -2533,6 +2583,15 @@ export function ChatsScreen({ openChatWithUserId, onChatOpened, onUnreadCountCha
                 </>
               )}
             </Button>
+            {/* Upload progress bar */}
+            {uploading && uploadPhase === 'uploading' && uploadProgress && (
+              <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden mt-1">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-200"
+                  style={{ width: `${uploadProgress.percent}%` }}
+                />
+              </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

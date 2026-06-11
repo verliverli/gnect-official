@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Bookmark, Loader2, Compass, MapPin, Star, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getMediaUrl } from '@/lib/constants'
+import { getMediaUrlThumbnail } from '@/lib/constants'
 import { GeometricAvatar } from '@/components/geometric-avatar'
 import { toast } from 'sonner'
 
@@ -162,7 +162,7 @@ export function SavedProfilesPanel({ onClose, onOpenProfile, onOpenChat }: Saved
                       <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted">
                         {displayPic ? (
                           <img
-                            src={getMediaUrl(displayPic.catbox_url) ?? undefined}
+                            src={getMediaUrlThumbnail(displayPic.catbox_url) ?? undefined}
                             alt={profile.nickname}
                             className="w-full h-full object-cover"
                             loading="lazy"

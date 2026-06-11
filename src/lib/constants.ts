@@ -225,6 +225,41 @@ export function getMediaUrl(storedUrl: string | null): string | null {
   return storedUrl
 }
 
+// Fast media URL — same as getMediaUrl but with aggressive caching parameters
+// Use for spotlight/full-screen views where quality matters but speed is critical
+// The proxy route adds immutable cache headers, so browser will cache forever after first load
+export function getMediaUrlFast(storedUrl: string | null): string | null {
+  if (!storedUrl) return null
+  if (storedUrl.startsWith("https://")) return storedUrl
+  if (storedUrl.startsWith("tg:")) {
+    const fileId = storedUrl.slice(3)
+    // No extra params needed — the route already serves with immutable cache headers
+    // But adding a hint for the route to know this is a full-quality request
+    return `/api/media/file/${encodeURIComponent(fileId)}?quality=full`
+  }
+  return storedUrl
+}
+
+// Thumbnail media URL — returns a smaller image for discover cards, lists, avatars
+// Much faster loading since Telegram thumbnails are typically 90x90 vs 800x800
+export function getMediaUrlThumbnail(storedUrl: string | null): string | null {
+  if (!storedUrl) return null
+  if (storedUrl.startsWith("https://")) return storedUrl
+  if (storedUrl.startsWith("tg:")) {
+    const fileId = storedUrl.slice(3)
+    return `/api/media/file/${encodeURIComponent(fileId)}?quality=thumbnail`
+  }
+  return storedUrl
+}
+
+// Preload helper — creates an Image() object to warm the browser cache
+// Use for preloading adjacent profile photos in spotlight view
+export function preloadImage(url: string): void {
+  if (typeof window === 'undefined') return
+  const img = new Image()
+  img.src = url
+}
+
 // ============================================
 // QUICK STATUS — Phase 5
 // ============================================

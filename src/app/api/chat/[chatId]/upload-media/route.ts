@@ -4,8 +4,11 @@ import { getCurrentUser } from "@/lib/auth"
 import { MEDIA_LIMITS, TELEGRAM_MEDIA } from "@/lib/constants"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
+const UPLOAD_TIMEOUT_MS = 60000 // 60s for slow connections in TZ/KE
+const MAX_REQUEST_SIZE = 10 * 1024 * 1024 // 10MB — reject oversized requests early
+const TELEGRAM_MAX_RETRIES = 1 // Retry once on Telegram API failure
 
-// POST /api/chat/[chatId]/upload-media — Upload a photo for chat (via direct Telegram Bot API)
+// POST /api/chat/[chatId]/upload-media — Upload a photo for chat (via Telegram Bot API with retry)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
@@ -19,6 +22,15 @@ export async function POST(
     const { chatId } = await params
     if (!chatId) {
       return NextResponse.json({ ok: false, error: "chatId is required" }, { status: 400 })
+    }
+
+    // Early request size check — reject before processing
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && parseInt(contentLength) > MAX_REQUEST_SIZE) {
+      return NextResponse.json(
+        { ok: false, error: "Request too large — image must be under 10MB" },
+        { status: 413 }
+      )
     }
 
     // Verify user is a participant of this chat
@@ -51,15 +63,15 @@ export async function POST(
       )
     }
 
-    // Validate file size (2MB limit for chat photos)
+    // Validate file size
     if (file.size > MEDIA_LIMITS.MAX_PHOTO_SIZE_BYTES) {
       return NextResponse.json(
-        { ok: false, error: "Image must be under 2MB" },
+        { ok: false, error: `Image must be under ${Math.round(MEDIA_LIMITS.MAX_PHOTO_SIZE_BYTES / 1024 / 1024)}MB` },
         { status: 400 }
       )
     }
 
-    // Upload directly to Telegram Bot API (no Cloudflare Worker)
+    // Upload to Telegram Bot API with retry logic
     const botToken = TELEGRAM_MEDIA.BOT_TOKEN
     const channelId = TELEGRAM_MEDIA.CHANNEL_ID
 
@@ -69,55 +81,86 @@ export async function POST(
     }
 
     let fileId: string
-    try {
-      const telegramForm = new FormData()
-      telegramForm.append("chat_id", channelId)
-      telegramForm.append("photo", file)
+    let lastTelegramError: string | null = null
 
-      const telegramRes = await fetch(
-        `${TELEGRAM_MEDIA.API_BASE}/bot${botToken}/sendPhoto`,
-        {
-          method: "POST",
-          body: telegramForm,
-          signal: AbortSignal.timeout(30000),
+    // Try CF Worker proxy first, then direct Telegram API as fallback
+    const apiEndpoints = [
+      TELEGRAM_MEDIA.API_BASE,         // CF Worker proxy (primary)
+      TELEGRAM_MEDIA.DIRECT_API_BASE,  // Direct Telegram API (fallback — may be blocked in TZ/KE)
+    ]
+
+    for (let attempt = 0; attempt <= TELEGRAM_MAX_RETRIES; attempt++) {
+      for (const apiBase of apiEndpoints) {
+        try {
+          const telegramForm = new FormData()
+          telegramForm.append("chat_id", channelId)
+          telegramForm.append("photo", file)
+
+          const telegramRes = await fetch(
+            `${apiBase}/bot${botToken}/sendPhoto`,
+            {
+              method: "POST",
+              body: telegramForm,
+              signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+            }
+          )
+
+          if (!telegramRes.ok) {
+            const errText = await telegramRes.text().catch(() => "Unknown error")
+            lastTelegramError = `Telegram API error ${telegramRes.status}: ${errText.slice(0, 200)}`
+            console.error(`[Chat Upload] ${lastTelegramError} (endpoint: ${apiBase})`)
+            // Try next endpoint
+            continue
+          }
+
+          const telegramData = await telegramRes.json()
+          if (!telegramData.ok || !telegramData.result?.photo?.[0]?.file_id) {
+            lastTelegramError = `Telegram unexpected response: ${JSON.stringify(telegramData).slice(0, 200)}`
+            console.error(`[Chat Upload] ${lastTelegramError}`)
+            // Try next endpoint
+            continue
+          }
+
+          // Success — use the largest photo size's file_id for best quality
+          const photos = telegramData.result.photo
+          fileId = photos[photos.length - 1].file_id
+
+          // Store as "tg:{file_id}" in database — our getMediaUrl() helper converts this
+          const mediaUrl = `tg:${fileId}`
+
+          return NextResponse.json({ ok: true, data: { url: mediaUrl } })
+        } catch (uploadErr) {
+          const errMsg = uploadErr instanceof Error ? uploadErr.message : "Unknown upload error"
+          lastTelegramError = errMsg
+          console.error(`[Chat Upload] Error (endpoint: ${apiBase}, attempt: ${attempt + 1}):`, errMsg)
+          // Try next endpoint on this attempt
+          continue
         }
-      )
-
-      if (!telegramRes.ok) {
-        const errText = await telegramRes.text().catch(() => "Unknown error")
-        console.error("Telegram upload error:", telegramRes.status, errText)
-        return NextResponse.json(
-          { ok: false, error: "Image upload failed — storage service error" },
-          { status: 500 }
-        )
       }
 
-      const telegramData = await telegramRes.json()
-      if (!telegramData.ok || !telegramData.result?.photo?.[0]?.file_id) {
-        console.error("Telegram unexpected response:", telegramData)
-        return NextResponse.json(
-          { ok: false, error: "Image upload failed — invalid response" },
-          { status: 500 }
-        )
+      // If we've tried all endpoints and still failed, wait before retrying
+      if (attempt < TELEGRAM_MAX_RETRIES) {
+        const delay = 1000 * Math.pow(2, attempt) // Exponential backoff: 1s, 2s
+        console.log(`[Chat Upload] All endpoints failed, retrying in ${delay}ms...`)
+        await new Promise((r) => setTimeout(r, delay))
       }
+    }
 
-      // Use the largest photo size's file_id for best quality
-      const photos = telegramData.result.photo
-      fileId = photos[photos.length - 1].file_id
-    } catch (uploadErr) {
-      console.error("Telegram upload error:", uploadErr)
+    // All attempts failed
+    console.error(`[Chat Upload] All attempts failed. Last error: ${lastTelegramError}`)
+    return NextResponse.json(
+      { ok: false, error: "Image upload failed — storage service unavailable. Please try again." },
+      { status: 503 }
+    )
+  } catch (error) {
+    console.error("Chat media upload error:", error)
+    const msg = error instanceof Error ? error.message : "Unknown error"
+    if (msg.includes("timeout") || msg.includes("TIMEOUT")) {
       return NextResponse.json(
-        { ok: false, error: "Image upload timed out or failed — please try again" },
+        { ok: false, error: "Upload timed out — your connection may be slow. Please try again." },
         { status: 504 }
       )
     }
-
-    // Store as "tg:{file_id}" in database — our getMediaUrl() helper converts this
-    const mediaUrl = `tg:${fileId}`
-
-    return NextResponse.json({ ok: true, data: { url: mediaUrl } })
-  } catch (error) {
-    console.error("Chat media upload error:", error)
-    return NextResponse.json({ ok: false, error: "Failed to upload media" }, { status: 500 })
+    return NextResponse.json({ ok: false, error: "Failed to upload media — please try again" }, { status: 500 })
   }
 }

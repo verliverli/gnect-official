@@ -9,6 +9,7 @@ import { useAppCache } from '@/lib/app-cache'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { ROLES, BODY_TYPES, INTO_TAGS, AVAILABILITY_STATUSES, MEDIA_LIMITS, getMediaUrl, STATUS_PRESETS, STATUS_DURATIONS, SAFE_PAGES, getRegionsForCountry, getCountryFlag, RATE_LIMITS } from '@/lib/constants'
+import { compressImage, validateImageFile, uploadWithProgress, withRetry, isRetryableError, formatFileSize, type UploadProgress } from '@/lib/media-utils'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { AdminBroadcastPanel } from '@/components/admin-broadcast-panel'
@@ -37,6 +38,29 @@ interface OwnPhoto {
   is_face_pic: boolean
   is_locked: boolean
   upload_order: number
+  uploaded_at: string
+}
+
+function relativeTime(dateStr: string): string {
+  const now = Date.now()
+  const then = new Date(dateStr).getTime()
+  const diffMs = now - then
+
+  if (diffMs < 0) return 'just now'
+
+  const seconds = Math.floor(diffMs / 1000)
+  if (seconds < 60) return 'just now'
+
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
 export function ProfilePanel({ onClose }: ProfilePanelProps) {
@@ -67,6 +91,8 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
   const [saving, setSaving] = useState<string | null>(null)
   const [photos, setPhotos] = useState<OwnPhoto[]>([])
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'compressing' | 'uploading'>('idle')
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const photoInputRef = useRef<HTMLInputElement>(null)
 
@@ -169,35 +195,66 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Only JPEG, PNG, and WebP images allowed')
-      return
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Photo must be under 2MB')
+    // Step 1: Validate the file
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      toast.error(validation.error!)
+      if (photoInputRef.current) photoInputRef.current.value = ''
       return
     }
 
     // Free Test Version: ALL users get 2 photo slots (MAX_FREE_PROFILE_PHOTOS)
-    // Premium photo limits are not active during the free test version
     const maxPhotos = MEDIA_LIMITS.MAX_FREE_PROFILE_PHOTOS
     if (photos.length >= maxPhotos) {
       toast.error(`Photo limit reached (${maxPhotos} photos max)`)
+      if (photoInputRef.current) photoInputRef.current.value = ''
       return
     }
 
-    const formData = new FormData()
-    formData.append('photo', file)
-
     try {
+      // Step 2: Compress the image
       setSaving('photo')
-      const res = await fetch('/api/profile/upload-photo', {
-        method: 'POST',
-        body: formData,
-        credentials: 'same-origin',
-      })
-      const data = await res.json()
+      setUploadPhase('compressing')
+      setUploadProgress(null)
+
+      const originalSize = file.size
+      const compressed = await compressImage(file, 1024 * 1024, 1600) // Target 1MB, max width 1600px
+
+      // Log compression result for debugging
+      if (compressed.size < originalSize) {
+        console.log(`[Upload] Compressed: ${formatFileSize(originalSize)} → ${formatFileSize(compressed.size)}`)
+      }
+
+      // Check if compressed size is still too large (2MB hard limit)
+      if (compressed.size > MEDIA_LIMITS.MAX_PHOTO_SIZE_BYTES) {
+        toast.error('Image too large even after compression — try a smaller image')
+        return
+      }
+
+      // Step 3: Upload with progress + retry
+      setUploadPhase('uploading')
+
+      const formData = new FormData()
+      // Use a filename with the correct extension for the compressed blob
+      const ext = compressed.type === 'image/webp' ? 'webp' : 'jpg'
+      formData.append('photo', compressed, `photo.${ext}`)
+
+      const data = await withRetry(
+        () =>
+          uploadWithProgress<{ ok: boolean; error?: string; data?: unknown }>({
+            url: '/api/profile/upload-photo',
+            formData,
+            credentials: 'same-origin',
+            onProgress: setUploadProgress,
+            timeout: 60000,
+          }),
+        {
+          maxRetries: 2,
+          baseDelayMs: 1000,
+          shouldRetry: isRetryableError,
+        }
+      )
+
       if (data.ok) {
         toast.success('Photo uploaded!')
         // Refresh photos list
@@ -214,10 +271,17 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
       } else {
         toast.error(data.error || 'Upload failed')
       }
-    } catch {
-      toast.error('Network error')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      if (msg.includes('Network error') || msg.includes('fetch') || msg.includes('timed out')) {
+        toast.error('Network error — please check your connection and try again')
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setSaving(null)
+      setUploadPhase('idle')
+      setUploadProgress(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
     }
   }
@@ -399,8 +463,13 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
               <span className="text-xs font-medium text-muted-foreground">
                 Photos {photos.length}/{maxPhotos}
               </span>
-              {saving === 'photo' && (
-                <span className="text-xs text-primary animate-pulse">Uploading...</span>
+              {saving === 'photo' && uploadPhase === 'compressing' && (
+                <span className="text-xs text-primary animate-pulse">Compressing...</span>
+              )}
+              {saving === 'photo' && uploadPhase === 'uploading' && (
+                <span className="text-xs text-primary animate-pulse">
+                  Uploading... {uploadProgress ? `${uploadProgress.percent}%` : ''}
+                </span>
               )}
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -445,6 +514,10 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
                       Locked
                     </span>
                   )}
+                  {/* Upload timestamp */}
+                  {photo.uploaded_at && (
+                    <span className="absolute bottom-1.5 left-1.5 text-[9px] text-white/60">{relativeTime(photo.uploaded_at)}</span>
+                  )}
                 </div>
               ))}
               {/* Add photo button (only if under limit) */}
@@ -458,6 +531,15 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
                 </button>
               )}
             </div>
+            {/* Upload progress bar */}
+            {saving === 'photo' && uploadPhase === 'uploading' && uploadProgress && (
+              <div className="mt-2 w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-200"
+                  style={{ width: `${uploadProgress.percent}%` }}
+                />
+              </div>
+            )}
           </div>
         )}
 

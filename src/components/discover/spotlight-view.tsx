@@ -23,6 +23,7 @@ import {
   BarChart3,
   Link2,
   Star,
+  Camera,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,7 +46,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/lib/store'
 import { useDataStore } from '@/lib/data-store'
-import { getMediaUrl } from '@/lib/constants'
+import { getMediaUrl, getMediaUrlFast, preloadImage } from '@/lib/constants'
 import { GeometricAvatar } from '@/components/geometric-avatar'
 import { StarRating } from '@/components/star-rating'
 
@@ -58,6 +59,7 @@ interface SpotlightPhoto {
   catbox_url: string
   is_face_pic: boolean
   is_locked: boolean
+  uploaded_at?: string
 }
 
 interface SpotlightProfile {
@@ -101,7 +103,7 @@ interface SpotlightInitialData {
   is_online: boolean
   is_in_app: boolean
   last_seen: string
-  photos: { id: string; catbox_url: string; is_face_pic: boolean; is_locked: boolean }[]
+  photos: { id: string; catbox_url: string; is_face_pic: boolean; is_locked: boolean; uploaded_at?: string }[]
   into_tags: string[]
   is_saved: boolean
   rating_avg: number
@@ -543,6 +545,52 @@ export function SpotlightView({
     setPhotoIndex((prev) => (prev - 1 + profile.photos.length) % profile.photos.length)
   }
 
+  // ===== IMAGE PRELOADING =====
+  // Preload adjacent photos in the current profile's gallery
+  // When user views photo N, preload N+1 and N+2
+  useEffect(() => {
+    if (!profile || profile.photos.length <= 1) return
+    // Preload next 2 photos in gallery
+    const next1 = (photoIndex + 1) % profile.photos.length
+    const next2 = (photoIndex + 2) % profile.photos.length
+    const photo1 = profile.photos[next1]
+    const photo2 = profile.photos[next2]
+    if (photo1 && !photo1.is_locked) {
+      const url = getMediaUrlFast(photo1.catbox_url)
+      if (url) preloadImage(url)
+    }
+    if (photo2 && !photo2.is_locked && next2 !== next1) {
+      const url = getMediaUrlFast(photo2.catbox_url)
+      if (url) preloadImage(url)
+    }
+  }, [photoIndex, profile])
+
+  // Preload first photo of cached adjacent profiles
+  // This makes swiping to next/prev profile feel instant
+  useEffect(() => {
+    if (!profile) return
+    // Look through profile cache for adjacent profiles and preload their first photo
+    const timer = setTimeout(() => {
+      for (const [, cached] of profileCache) {
+        if (cached.data.id === userId) continue
+        const firstPhoto = cached.data.photos.find((p) => !p.is_locked)
+        if (firstPhoto) {
+          const url = getMediaUrlFast(firstPhoto.catbox_url)
+          if (url) preloadImage(url)
+        }
+        // Only preload first 3 adjacent profiles
+        let count = 0
+        for (const [, c] of profileCache) {
+          if (c.data.id === userId) continue
+          count++
+          if (count >= 3) break
+        }
+        break
+      }
+    }, 1200) // Delay to not compete with current profile fetch
+    return () => clearTimeout(timer)
+  }, [userId, profile])
+
   // Is new user (< 7 days)
   const isNew = profile
     ? Date.now() - new Date(profile.created_at).getTime() < 7 * 24 * 60 * 60 * 1000
@@ -676,10 +724,10 @@ export function SpotlightView({
                   {unlockedPhotos.has(currentPhoto.id) ? (
                     /* Unlocked photo — reveal it */
                     <img
-                      src={getMediaUrl(currentPhoto.catbox_url) ?? undefined}
+                      src={getMediaUrlFast(currentPhoto.catbox_url) ?? undefined}
                       alt={`${profile.nickname}'s photo`}
                       className="w-full h-full object-cover"
-                      loading="lazy"
+                      loading="eager"
                       decoding="async"
                     />
                   ) : currentPhoto.is_locked ? (
@@ -697,10 +745,10 @@ export function SpotlightView({
                   ) : (
                     /* Normal photo */
                     <img
-                      src={getMediaUrl(currentPhoto.catbox_url) ?? undefined}
+                      src={getMediaUrlFast(currentPhoto.catbox_url) ?? undefined}
                       alt={`${profile.nickname}'s photo`}
                       className="w-full h-full object-cover"
-                      loading="lazy"
+                      loading="eager"
                       decoding="async"
                     />
                   )}
@@ -961,6 +1009,14 @@ export function SpotlightView({
                   </span>
                   <span className="font-medium">{relativeTime(profile.last_seen)}</span>
                 </div>
+                {currentPhoto?.uploaded_at && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <Camera className="w-3 h-3" /> Photo added
+                    </span>
+                    <span className="font-medium">{relativeTime(currentPhoto.uploaded_at)}</span>
+                  </div>
+                )}
               </div>
             </DetailSection>
           </div>

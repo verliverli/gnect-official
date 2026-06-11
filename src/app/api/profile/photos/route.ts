@@ -19,6 +19,7 @@ export async function GET() {
         is_face_pic: true,
         is_locked: true,
         upload_order: true,
+        uploaded_at: true,
       },
     })
 

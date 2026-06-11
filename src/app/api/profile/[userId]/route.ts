@@ -62,6 +62,7 @@ export async function GET(
             catbox_url: true,
             is_face_pic: true,
             is_locked: true,
+            uploaded_at: true,
           },
           orderBy: { upload_order: "asc" },
         },

@@ -2,7 +2,7 @@
 
 import { Bookmark, BookmarkCheck, MapPin, Flame, Star } from 'lucide-react'
 import { useCallback, useMemo, memo } from 'react'
-import { getMediaUrl } from '@/lib/constants'
+import { getMediaUrl, getMediaUrlThumbnail } from '@/lib/constants'
 import { GeometricAvatar } from '@/components/geometric-avatar'
 
 interface BannerCardProps {
@@ -95,7 +95,7 @@ export const BannerCard = memo(function BannerCard({
           <div className="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-muted">
             {displayPic ? (
               <img
-                src={getMediaUrl(displayPic.catbox_url) ?? undefined}
+                src={getMediaUrlThumbnail(displayPic.catbox_url) ?? undefined}
                 alt={user.nickname}
                 className="w-full h-full object-cover gnect-photo-shimmer"
                 loading="lazy"
