@@ -105,18 +105,20 @@ export async function GET(
       // Use CF Worker proxy for getFile to bypass TZ/KE blocks
       const cfWorkerUrl = process.env.CF_MEDIA_WORKER_URL || "https://gnect-media.03mrfrancis.workers.dev"
       
-      // Try CF Worker first, then direct Telegram API as fallback
-      const apiEndpoints = [
-        cfWorkerUrl,
-        "https://api.telegram.org",
+      // Try CF Worker first (uses /bot/method format, no token in URL), then direct Telegram API
+      const getFileEndpoints = [
+        { url: `${cfWorkerUrl}/bot/getFile?file_id=${encodeURIComponent(fileId)}`, method: 'POST' },
+        { url: `https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`, method: 'GET' },
       ]
       
       let fileData: { ok: boolean; result?: { file_path?: string } } | null = null
       
-      for (const apiBase of apiEndpoints) {
+      for (const endpoint of getFileEndpoints) {
         try {
-          const getFileUrl = `${apiBase}/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`
-          const fileRes = await fetch(getFileUrl, { signal: AbortSignal.timeout(10000) })
+          const fileRes = await fetch(endpoint.url, { 
+            method: endpoint.method,
+            signal: AbortSignal.timeout(10000) 
+          })
           
           if (!fileRes.ok) continue
           
@@ -166,16 +168,18 @@ export async function GET(
     }
 
     // Step 3: Fetch the actual file data from Telegram via CF Worker proxy
-    // Try CF Worker first, then direct API as fallback for reliability
+    // CF Worker uses /file/ path format (no token in URL), direct API uses /file/bot{token}/ format
     const cfWorkerUrl = process.env.CF_MEDIA_WORKER_URL || "https://gnect-media.03mrfrancis.workers.dev"
-    const mediaEndpoints = [cfWorkerUrl, "https://api.telegram.org"]
+    const mediaEndpoints = [
+      { url: `${cfWorkerUrl}/file/${downloadPath}`, isCf: true },
+      { url: `https://api.telegram.org/file/bot${botToken}/${downloadPath}`, isCf: false },
+    ]
     
     let mediaRes: Response | null = null
     
-    for (const apiBase of mediaEndpoints) {
+    for (const endpoint of mediaEndpoints) {
       try {
-        const directUrl = `${apiBase}/file/bot${botToken}/${downloadPath}`
-        const res = await fetch(directUrl, { signal: AbortSignal.timeout(15000) })
+        const res = await fetch(endpoint.url, { signal: AbortSignal.timeout(15000) })
         
         if (res.ok) {
           mediaRes = res
@@ -184,8 +188,8 @@ export async function GET(
         
         // If thumbnail path failed, try original path
         if (!res.ok && quality === "thumbnail" && downloadPath !== filePath) {
-          const fallbackUrl = `${apiBase}/file/bot${botToken}/${filePath}`
-          const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(15000) })
+          const fallbackPath = endpoint.isCf ? `${cfWorkerUrl}/file/${filePath}` : `https://api.telegram.org/file/bot${botToken}/${filePath}`
+          const fallbackRes = await fetch(fallbackPath, { signal: AbortSignal.timeout(15000) })
           if (fallbackRes.ok) {
             mediaRes = fallbackRes
             break
