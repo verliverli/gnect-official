@@ -64,7 +64,7 @@ export default {
     // API proxy: POST /bot/:method
     if (url.pathname.startsWith('/bot/')) {
       const method = url.pathname.replace('/bot/', '');
-      const telegramUrl = `https://api.telegram.org/bot${botToken}/${method}`;
+      const telegramUrl = `https://api.telegram.org/bot${botToken}/${method}${url.search}`;
       
       try {
         const headers = new Headers(request.headers);

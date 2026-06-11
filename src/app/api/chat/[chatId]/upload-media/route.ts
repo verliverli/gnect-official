@@ -84,20 +84,24 @@ export async function POST(
     let lastTelegramError: string | null = null
 
     // Try CF Worker proxy first, then direct Telegram API as fallback
+    // CF Worker uses /bot/method (has its own BOT_TOKEN), Direct API uses /bot{token}/method
     const apiEndpoints = [
-      TELEGRAM_MEDIA.API_BASE,         // CF Worker proxy (primary)
-      TELEGRAM_MEDIA.DIRECT_API_BASE,  // Direct Telegram API (fallback — may be blocked in TZ/KE)
+      { base: TELEGRAM_MEDIA.API_BASE, isCf: true },        // CF Worker proxy (primary)
+      { base: TELEGRAM_MEDIA.DIRECT_API_BASE, isCf: false }, // Direct Telegram API (fallback)
     ]
 
     for (let attempt = 0; attempt <= TELEGRAM_MAX_RETRIES; attempt++) {
-      for (const apiBase of apiEndpoints) {
+      for (const endpoint of apiEndpoints) {
         try {
           const telegramForm = new FormData()
           telegramForm.append("chat_id", channelId)
           telegramForm.append("photo", file)
 
-          const telegramRes = await fetch(
-            `${apiBase}/bot${botToken}/sendPhoto`,
+          const uploadUrl = endpoint.isCf
+            ? `${endpoint.base}/bot/sendPhoto`
+            : `${endpoint.base}/bot${botToken}/sendPhoto`
+
+          const telegramRes = await fetch(uploadUrl,
             {
               method: "POST",
               body: telegramForm,
@@ -108,7 +112,7 @@ export async function POST(
           if (!telegramRes.ok) {
             const errText = await telegramRes.text().catch(() => "Unknown error")
             lastTelegramError = `Telegram API error ${telegramRes.status}: ${errText.slice(0, 200)}`
-            console.error(`[Chat Upload] ${lastTelegramError} (endpoint: ${apiBase})`)
+            console.error(`[Chat Upload] ${lastTelegramError} (endpoint: ${endpoint.base})`)
             // Try next endpoint
             continue
           }
@@ -132,7 +136,7 @@ export async function POST(
         } catch (uploadErr) {
           const errMsg = uploadErr instanceof Error ? uploadErr.message : "Unknown upload error"
           lastTelegramError = errMsg
-          console.error(`[Chat Upload] Error (endpoint: ${apiBase}, attempt: ${attempt + 1}):`, errMsg)
+          console.error(`[Chat Upload] Error (endpoint: ${endpoint.base}, attempt: ${attempt + 1}):`, errMsg)
           // Try next endpoint on this attempt
           continue
         }
