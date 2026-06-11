@@ -1,29 +1,22 @@
 import { NextResponse } from 'next/server'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 // APK download info endpoint
-// Returns whether the Android APK is available for download and its metadata
+// Reads download-info.json directly from the filesystem and checks if APK exists
 export async function GET() {
   try {
-    // Fetch the download info JSON from static files
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_APP_URL || ''
+    const infoPath = join(process.cwd(), 'public', 'downloads', 'download-info.json')
+    const infoRaw = await readFile(infoPath, 'utf-8')
+    const info = JSON.parse(infoRaw)
 
-    const infoRes = await fetch(`${baseUrl}/downloads/download-info.json`, {
-      next: { revalidate: 60 }, // Cache for 60s
-    })
-    if (!infoRes.ok) {
-      return NextResponse.json({ ok: false, available: false })
-    }
-
-    const info = await infoRes.json()
-
-    // Check if APK file exists by HEAD request
+    // Check if APK file actually exists on disk
     let available = false
     if (info.filename) {
       try {
-        const apkRes = await fetch(`${baseUrl}/downloads/${info.filename}`, { method: 'HEAD' })
-        available = apkRes.ok
+        const apkPath = join(process.cwd(), 'public', 'downloads', info.filename)
+        await readFile(apkPath)
+        available = true
       } catch {
         available = false
       }
