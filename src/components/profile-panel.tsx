@@ -24,6 +24,7 @@ import { DeleteAccount } from '@/components/account-deletion'
 import { SupportScreen } from '@/components/support/support-screen'
 import { GeometricAvatar } from '@/components/geometric-avatar'
 import { InstallAppButton } from '@/components/install-app-button'
+import { InstallGuide } from '@/components/install-guide'
 
 interface ProfilePanelProps {
   onClose: () => void
@@ -71,6 +72,7 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
   const [showAdminPanel, setShowAdminPanel] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
+  const [showInstallGuide, setShowInstallGuide] = useState(false)
   const [bio, setBio] = useState(user?.bio ?? '')
   const [heightVal, setHeightVal] = useState(user?.height?.toString() ?? '')
   const [weightVal, setWeightVal] = useState(user?.weight?.toString() ?? '')
@@ -960,6 +962,12 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
               <h3 className="text-sm font-semibold">Install GNECT</h3>
             </div>
             <InstallAppButton />
+            <button
+              onClick={() => setShowInstallGuide(true)}
+              className="w-full text-center text-xs text-primary/70 hover:text-primary transition-colors py-1"
+            >
+              Read full install guide →
+            </button>
           </div>
 
           {/* BOSS MODE — Admin Panel — only for admins */}
@@ -1100,6 +1108,11 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
       {/* Support Screen overlay */}
       <AnimatePresence>
         {showSupport && <SupportScreen onClose={() => setShowSupport(false)} />}
+      </AnimatePresence>
+
+      {/* Install Guide overlay */}
+      <AnimatePresence>
+        {showInstallGuide && <InstallGuide onClose={() => setShowInstallGuide(false)} />}
       </AnimatePresence>
     </motion.div>
   )
