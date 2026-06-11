@@ -955,6 +955,23 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
             </div>
           </SectionCard>
 
+          {/* Install App — standalone card, always visible */}
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Download className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-semibold">Install GNECT</h3>
+            </div>
+            {/* Smart install button — handles browser install (Chrome) + APK download */}
+            <InstallAppButton onOpenGuide={() => setShowInstallGuide(true)} />
+            {/* Link to full install guide with manual steps for all devices */}
+            <button
+              onClick={() => setShowInstallGuide(true)}
+              className="w-full text-center text-xs text-primary/70 hover:text-primary transition-colors py-1"
+            >
+              View install guide for all devices →
+            </button>
+          </div>
+
           {/* BOSS MODE — Admin Panel — only for admins */}
           {isAdmin && (
             <div className="space-y-2">
@@ -983,9 +1000,6 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
             onToggle={() => toggleSection('account')}
           >
             <div className="space-y-4">
-              {/* Download / Install App */}
-              <InstallAppButton onOpenGuide={() => setShowInstallGuide(true)} />
-
               {/* Password recovery warning — always visible */}
               <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
                 <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
