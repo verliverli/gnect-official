@@ -60,55 +60,55 @@ export function AdminDashboard() {
     <div className="space-y-4">
       {/* Row 1: User stats */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard icon={<Users className="w-4 h-4" />} label="Total Users" value={data.users.total} />
-        <StatCard icon={<Wifi className="w-4 h-4" />} label="Online Now" value={data.users.online} accent />
-        <StatCard icon={<UserPlus className="w-4 h-4" />} label="New Today" value={data.users.newToday} />
-        <StatCard icon={<Calendar className="w-4 h-4" />} label="New This Week" value={data.users.newThisWeek} />
+        <StatCard icon={<Users className="w-4 h-4" />} label="Total Users" value={data.users.total} color="white" />
+        <StatCard icon={<Wifi className="w-4 h-4" />} label="Online Now" value={data.users.online} color="green" />
+        <StatCard icon={<UserPlus className="w-4 h-4" />} label="New Today" value={data.users.newToday} color="cyan" />
+        <StatCard icon={<Calendar className="w-4 h-4" />} label="New This Week" value={data.users.newThisWeek} color="yellow" />
       </div>
 
       {/* Row 2: Content stats */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard icon={<MessageCircle className="w-4 h-4" />} label="Total Chats" value={data.content.totalChats} />
-        <StatCard icon={<FileText className="w-4 h-4" />} label="Community Posts" value={data.content.totalCommunityPosts} />
-        <StatCard icon={<AlertTriangle className="w-4 h-4" />} label="Pending Reports" value={pendingReports} danger={pendingReports > 0} />
-        <StatCard icon={<Bug className="w-4 h-4" />} label="Errors" value={data.errors.unresolved} danger={data.errors.unresolved > 0} />
+        <StatCard icon={<MessageCircle className="w-4 h-4" />} label="Total Chats" value={data.content.totalChats} color="purple" />
+        <StatCard icon={<FileText className="w-4 h-4" />} label="Community Posts" value={data.content.totalCommunityPosts} color="pink" />
+        <StatCard icon={<AlertTriangle className="w-4 h-4" />} label="Pending Reports" value={pendingReports} color="red" />
+        <StatCard icon={<Bug className="w-4 h-4" />} label="Errors" value={data.errors.unresolved} color="orange" />
       </div>
 
       {/* 7-day user growth chart */}
-      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
+      <div className="bg-[#1e1e30] border border-white/10 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-emerald-400" />
-          <span className="text-sm font-semibold text-zinc-100">7-Day Signups</span>
+          <TrendingUp className="w-4 h-4 text-[#4ade80]" />
+          <span className="text-sm font-semibold text-white">7-Day Signups</span>
         </div>
         {data.userGrowth.length > 0 ? (
           <GrowthChart data={data.userGrowth} />
         ) : (
-          <p className="text-xs text-muted-foreground text-center py-4">No data</p>
+          <p className="text-xs text-gray-400 text-center py-4">No data</p>
         )}
       </div>
 
       {/* Top 5 regions */}
-      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
-        <span className="text-sm font-semibold mb-3 block text-zinc-100">Top 5 Regions</span>
+      <div className="bg-[#1e1e30] border border-white/10 rounded-xl p-4">
+        <span className="text-sm font-semibold mb-3 block text-white">Top 5 Regions</span>
         {data.regionBreakdown.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-2">No data</p>
+          <p className="text-xs text-gray-400 text-center py-2">No data</p>
         ) : (
           <div className="space-y-2">
             {data.regionBreakdown.map((r, i) => {
               const maxCount = data.regionBreakdown[0]?.count || 1
               const pct = Math.max(10, (r.count / maxCount) * 100)
-              const barColors = ['bg-emerald-400', 'bg-emerald-500', 'bg-teal-400', 'bg-green-400', 'bg-lime-400']
+              const barColors = ['bg-[#4ade80]', 'bg-[#22d3ee]', 'bg-[#a78bfa]', 'bg-[#f472b6]', 'bg-[#fbbf24]']
               return (
                 <div key={r.region} className="flex items-center gap-2">
                   <span className="text-sm shrink-0">{r.countryFlag}</span>
-                  <span className="text-xs text-zinc-300 w-24 truncate shrink-0 font-medium">{r.region}</span>
-                  <div className="flex-1 h-6 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
+                  <span className="text-xs text-white w-24 truncate shrink-0 font-medium">{r.region}</span>
+                  <div className="flex-1 h-6 bg-black/40 rounded-full overflow-hidden border border-white/10">
                     <div
                       className={`h-full ${barColors[i % barColors.length]} rounded-full transition-all`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-xs font-bold text-emerald-400 w-10 text-right">{r.count}</span>
+                  <span className="text-xs font-bold text-white w-10 text-right">{r.count}</span>
                 </div>
               )
             })}
@@ -117,30 +117,30 @@ export function AdminDashboard() {
       </div>
 
       {/* Top 5 countries */}
-      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
+      <div className="bg-[#1e1e30] border border-white/10 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Globe className="w-4 h-4 text-emerald-400" />
-          <span className="text-sm font-semibold text-zinc-100">Top 5 Countries</span>
+          <Globe className="w-4 h-4 text-[#4ade80]" />
+          <span className="text-sm font-semibold text-white">Top 5 Countries</span>
         </div>
         {data.countryBreakdown.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-2">No data</p>
+          <p className="text-xs text-gray-400 text-center py-2">No data</p>
         ) : (
           <div className="space-y-2">
             {data.countryBreakdown.map((c, ci) => {
               const maxCount = data.countryBreakdown[0]?.count || 1
               const pct = Math.max(10, (c.count / maxCount) * 100)
-              const barColors = ['bg-emerald-400', 'bg-emerald-500', 'bg-teal-400', 'bg-green-400', 'bg-lime-400']
+              const barColors = ['bg-[#4ade80]', 'bg-[#22d3ee]', 'bg-[#a78bfa]', 'bg-[#f472b6]', 'bg-[#fbbf24]']
               return (
                 <div key={c.country} className="flex items-center gap-2">
                   <span className="text-sm shrink-0">{c.flag}</span>
-                  <span className="text-xs text-zinc-300 w-24 truncate shrink-0 font-medium">{c.country}</span>
-                  <div className="flex-1 h-6 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
+                  <span className="text-xs text-white w-24 truncate shrink-0 font-medium">{c.country}</span>
+                  <div className="flex-1 h-6 bg-black/40 rounded-full overflow-hidden border border-white/10">
                     <div
                       className={`h-full ${barColors[ci % barColors.length]} rounded-full transition-all`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="text-xs font-bold text-emerald-400 w-10 text-right">{c.count}</span>
+                  <span className="text-xs font-bold text-white w-10 text-right">{c.count}</span>
                 </div>
               )
             })}
@@ -149,43 +149,49 @@ export function AdminDashboard() {
       </div>
 
       {/* Quick summary */}
-      <div className="bg-zinc-900/80 border border-zinc-700/60 rounded-xl p-4">
-        <span className="text-sm font-semibold mb-2 block text-zinc-100">Quick Summary</span>
+      <div className="bg-[#1e1e30] border border-white/10 rounded-xl p-4">
+        <span className="text-sm font-semibold mb-2 block text-white">Quick Summary</span>
         <div className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-xs">
-          <span className="text-zinc-400">Total Messages</span>
-          <span className="font-bold text-zinc-100 text-right">{data.content.totalMessages.toLocaleString()}</span>
-          <span className="text-zinc-400">New Feedback</span>
-          <span className="font-bold text-emerald-400 text-right">{data.feedback.newCount}</span>
-          <span className="text-zinc-400">User Reports</span>
-          <span className="font-bold text-amber-400 text-right">{data.reports.pendingUserReports}</span>
-          <span className="text-zinc-400">Post Reports</span>
-          <span className="font-bold text-amber-400 text-right">{data.reports.pendingPostReports}</span>
+          <span className="text-gray-400">Total Messages</span>
+          <span className="font-bold text-white text-right">{data.content.totalMessages.toLocaleString()}</span>
+          <span className="text-gray-400">New Feedback</span>
+          <span className="font-bold text-[#4ade80] text-right">{data.feedback.newCount}</span>
+          <span className="text-gray-400">User Reports</span>
+          <span className="font-bold text-[#fbbf24] text-right">{data.reports.pendingUserReports}</span>
+          <span className="text-gray-400">Post Reports</span>
+          <span className="font-bold text-[#fbbf24] text-right">{data.reports.pendingPostReports}</span>
         </div>
       </div>
     </div>
   )
 }
 
-function StatCard({ icon, label, value, accent, danger }: {
+// Color map for StatCard — each stat gets a unique bright color
+const CARD_STYLES: Record<string, { bg: string; border: string; icon: string; label: string; value: string }> = {
+  white:  { bg: 'bg-[#1e1e30]', border: 'border-white/20', icon: 'text-white',       label: 'text-gray-300', value: 'text-white' },
+  green:  { bg: 'bg-[#0a2e1a]', border: 'border-[#4ade80]/40', icon: 'text-[#4ade80]', label: 'text-[#86efac]', value: 'text-[#4ade80]' },
+  cyan:   { bg: 'bg-[#0a1e2e]', border: 'border-[#22d3ee]/40', icon: 'text-[#22d3ee]', label: 'text-[#67e8f9]', value: 'text-[#22d3ee]' },
+  yellow: { bg: 'bg-[#2e2a0a]', border: 'border-[#fbbf24]/40', icon: 'text-[#fbbf24]', label: 'text-[#fde68a]', value: 'text-[#fbbf24]' },
+  purple: { bg: 'bg-[#1a0a2e]', border: 'border-[#a78bfa]/40', icon: 'text-[#a78bfa]', label: 'text-[#c4b5fd]', value: 'text-[#a78bfa]' },
+  pink:   { bg: 'bg-[#2e0a1e]', border: 'border-[#f472b6]/40', icon: 'text-[#f472b6]', label: 'text-[#f9a8d4]', value: 'text-[#f472b6]' },
+  red:    { bg: 'bg-[#2e0a0a]', border: 'border-[#f87171]/40', icon: 'text-[#f87171]', label: 'text-[#fca5a5]', value: 'text-[#f87171]' },
+  orange: { bg: 'bg-[#2e1a0a]', border: 'border-[#fb923c]/40', icon: 'text-[#fb923c]', label: 'text-[#fdba74]', value: 'text-[#fb923c]' },
+}
+
+function StatCard({ icon, label, value, color }: {
   icon: React.ReactNode
   label: string
   value: number
-  accent?: boolean
-  danger?: boolean
+  color: string
 }) {
+  const style = CARD_STYLES[color] || CARD_STYLES.white
   return (
-    <div className={`rounded-xl p-3 border ${
-      danger 
-        ? 'bg-red-950/50 border-red-500/40' 
-        : accent 
-          ? 'bg-emerald-950/50 border-emerald-500/40' 
-          : 'bg-zinc-900/80 border-zinc-700/60'
-    }`}>
+    <div className={`rounded-xl p-3 border ${style.bg} ${style.border}`}>
       <div className="flex items-center gap-1.5 mb-1">
-        <span className={accent ? 'text-emerald-400' : danger ? 'text-red-400' : 'text-zinc-400'}>{icon}</span>
-        <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-medium">{label}</span>
+        <span className={style.icon}>{icon}</span>
+        <span className={`text-[10px] uppercase tracking-wider font-medium ${style.label}`}>{label}</span>
       </div>
-      <p className={`text-xl font-bold ${accent ? 'text-emerald-400' : danger ? 'text-red-400' : 'text-zinc-100'}`}>
+      <p className={`text-xl font-bold ${style.value}`}>
         {value.toLocaleString()}
       </p>
     </div>

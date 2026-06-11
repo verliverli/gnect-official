@@ -69,7 +69,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   }, [])
 
   const handleNickChange = (value: string) => {
-    if (value.length > 10) return
+    if (value.length > 6) return
     setNickname(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (value.length < 3) {
@@ -267,12 +267,12 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             <div className="relative">
               <Input
                 id="nickname"
-                placeholder="3-10 chars, letters/numbers/_"
+                placeholder="3-6 chars, letters/numbers/_"
                 value={nickname}
                 onChange={(e) => handleNickChange(e.target.value)}
                 className="pr-10 h-11 rounded-xl"
                 autoComplete="username"
-                maxLength={10}
+                maxLength={6}
               />
               {nickStatus === 'checking' && (
                 <Loader2 className="absolute right-3 top-3 h-5 w-5 animate-spin text-muted-foreground" />

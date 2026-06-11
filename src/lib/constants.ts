@@ -188,7 +188,7 @@ export const RATE_LIMITS = {
 // Nickname Rules
 export const NICKNAME_RULES = {
   MIN_LENGTH: 3,
-  MAX_LENGTH: 10,
+  MAX_LENGTH: 6,
   PATTERN: /^[a-zA-Z0-9_]+$/, // alphanumeric + underscore only
 } as const
 
